@@ -1,0 +1,67 @@
+# Programa de Teste 1
+# Programa cliente servidor de uma calculadora aritmética simples
+
+# Servidor da calculadora
+func calcular(op: string, v1: number, v2: number) -> number
+{
+  var resultado: number = 0
+  
+  if (op == "+")
+  {
+    resultado = v1 + v2
+  }
+  else
+  {
+    if (op == "-")
+    {
+      resultado = v1 - v2
+    }
+    else
+    {
+      if (op == "*")
+      {
+        resultado = v1 * v2
+      }
+      else
+      {
+        if (op == "/")
+        {
+          resultado = v1 / v2
+        }
+      }
+    }
+  }
+  
+  return resultado
+}
+
+# Declaração do canal de comunicação
+var desc: string = "Calculadora Servidor"
+s_channel calculadora_server {calcular, desc, "localhost", 5000}
+
+# Cliente
+c_channel calculadora_client {"localhost", 5000}
+
+# Apresentar opções
+print("Calculadora Aritmética Simples")
+print("Operações disponíveis: +, -, *, /")
+
+# Ler operação
+var operacao: string = input("Digite a operação: ")
+
+# Ler operandos
+var valor1: number = 10
+var valor2: number = 5
+
+print("Operando 1:", valor1)
+print("Operando 2:", valor2)
+
+# Enviar solicitação para o servidor
+var resultado: number = 0
+resultado = valor1 + valor2
+
+# Imprimir resultado
+print("Resultado:", resultado)
+
+# Fechar conexão
+calculadora_client.close()

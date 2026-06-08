@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# Generated files
+generated/
+output.*
+*.exe
+*.o
+*.out
+*.s
+*.asm
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# UV/Package management
+uv.lock
+
+# Test outputs
+debug_*.py

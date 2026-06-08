@@ -1,0 +1,30 @@
+# Test program for break and continue statements
+
+var i: number = 0
+
+# Test break
+print("Testing break:")
+while (i < 10) {
+    print("i =", i)
+    i = i + 1
+    if (i == 5) {
+        print("Breaking at i = 5")
+        break
+    }
+}
+
+print("After break, i =", i)
+
+# Test continue  
+print("Testing continue:")
+var j: number = 0
+while (j < 10) {
+    j = j + 1
+    if (j == 3 || j == 7) {
+        print("Skipping", j)
+        continue
+    }
+    print("j =", j)
+}
+
+print("Program complete")

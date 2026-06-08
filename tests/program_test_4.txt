@@ -1,0 +1,48 @@
+Programa de Teste 7.
+#Implementar um programa na linguagem Minipar para o código seguinte
+#(python) da implementação do serie de Fibonacci com 5 termos
+#Somente usando funções da Linguagem MINIPAR
+
+# Série de Fibonacci com 5 termos
+n = 5
+a = 0
+b = 1
+print("Série de Fibonacci com", n, "termos:")
+for i in range(n):
+print(a)
+proximo = a + b
+a = b
+b = próximo
+Execução-OK
+Série de Fibonacci com 5 termos:
+0
+1
+1
+2
+3
+...Program finished with exit code 0
+Press ENTER to exit console.
+
+Código gerado (Assembly ARMv7) a rodar no Emulador
+CPUlator – Rodou OK
+.global _start
+_start:
+MOV R0, #0 @ a = 0
+MOV R1, #1 @ b = 1
+MOV R2, #0 @ contador = 0
+MOV R3, #5 @ número de termos = 5
+LDR R4, =FIB_MEM @ ponteiro para memória de saída
+loop:
+CMP R2, R3 @ verifica se contador < 5
+BGE end @ se contador >= 5, termina
+STR R0, [R4], #4 @ armazena 'a' na memória e incrementa
+ponteiro
+ADD R5, R0, R1 @ proximo = a + b
+MOV R0, R1 @ a = b
+MOV R1, R5 @ b = proximo
+ADD R2, R2, #1 @ contador += 1
+B loop
+end:
+B . @ loop infinito para encerrar
+.data
+FIB_MEM: .space 20 @ espaço para 5 inteiros (5 x 4 bytes)

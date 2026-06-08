@@ -1,0 +1,49 @@
+# Programa de Teste 2
+# Execução paralela de Fatorial e Fibonacci
+
+par
+{
+  # Thread 1: Cálculo do Fatorial
+  func fatorial(n: number) -> number
+  {
+    var fat: number = 1
+    var i: number = 1
+    
+    while(i <= n)
+    {
+      fat = fat * i
+      i = i + 1
+    }
+    
+    return fat
+  }
+  
+  print("Thread 1: Calculando Fatorial")
+  var num_fat: number = 5
+  var res_fat: number = fatorial(num_fat)
+  print("Fatorial de", num_fat, "é", res_fat)
+}
+{
+  # Thread 2: Cálculo da Série de Fibonacci
+  func fibonacci(n: number) -> void
+  {
+    var a: number = 0
+    var b: number = 1
+    var i: number = 0
+    
+    print("Série de Fibonacci com", n, "termos:")
+    
+    while(i < n)
+    {
+      print(a)
+      var proximo: number = a + b
+      a = b
+      b = proximo
+      i = i + 1
+    }
+  }
+  
+  print("Thread 2: Calculando Fibonacci")
+  var num_fib: number = 5
+  fibonacci(num_fib)
+}

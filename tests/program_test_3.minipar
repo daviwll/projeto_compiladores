@@ -1,0 +1,19 @@
+# Programa de Teste 3
+# Implementação do fatorial de forma iterativa
+# Baseado no código Python fornecido
+
+print("Cálculo do Fatorial de 5 - Iterativo")
+
+var numero: number = 5
+var fatorial: number = 1
+var i: number = 1
+
+# Cálculo iterativo do fatorial
+while(i <= numero)
+{
+  fatorial = fatorial * i
+  i = i + 1
+}
+
+# Imprimir resultado
+print("O fatorial de", numero, "é", fatorial)

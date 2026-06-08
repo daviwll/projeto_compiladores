@@ -1,0 +1,18 @@
+# Simple Echo Server
+# Run this FIRST in one terminal
+
+print("Starting Simple Echo Server...")
+
+# Define the echo function
+func echo(message: string) -> string
+{
+  print("  Server received:", message)
+  return message
+}
+
+# Create server channel
+var desc: string = "Echo Server - Echoes back your message"
+s_channel echo_server {echo, desc, "localhost", 5001}
+
+print("Echo Server is ready on port 5001...")
+print("Waiting for connections...")

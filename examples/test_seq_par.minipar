@@ -1,0 +1,26 @@
+# Test program for SEQ and PAR blocks
+
+var counter: number = 0
+
+func increment() -> void {
+    counter = counter + 1
+    print("Counter:", counter)
+}
+
+# Sequential execution block (lowercase seq)
+seq {
+    print("Starting sequential execution")
+    increment()
+    increment()
+    increment()
+    print("Sequential execution complete")
+}
+
+# Parallel execution block (lowercase par)
+par {
+    print("Task 1 executing")
+    print("Task 2 executing")
+    print("Task 3 executing")
+}
+
+print("Program finished")

@@ -1,0 +1,6 @@
+# Minipar Compiler Web Interface Requirements
+
+# Core web interface
+gradio>=4.0.0
+
+# No additional requirements needed - uses existing compiler modules

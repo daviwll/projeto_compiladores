@@ -1,0 +1,40 @@
+Programa de Teste 6.
+#Implementar um programa na linguagem Minipar para o código seguinte
+#(python) da implementação do fatorial de 5
+#Somente usando funções da Linguagem MINIPAR
+
+# Cálculo do fatorial de 5 de forma iterativa
+numero = 5
+fatorial = 1
+for i in range(1, numero + 1):
+fatorial *= i
+print("O fatorial de", numero, "é", fatorial)
+
+Execução:
+O fatorial de 5 é 120
+
+...Program finished with exit code 0
+Press ENTER to exit console.
+
+Código gerado (Assembly ARMv7) a rodar no Emulador CPUlator
+– Rodou OK
+.global _start
+_start:
+MOV R0, #1 @ fatorial = 1
+MOV R1, #1 @ i = 1
+MOV R2, #5 @ limite = 5
+loop:
+CMP R1, R2 @ compara i com 5
+BGT end @ se i > 5, sai do loop
+MUL R0, R0, R1 @ fatorial *= i
+ADD R1, R1, #1 @ i += 1
+B loop @ repete o loop
+
+end:
+@ Resultado final está em R0
+@ Para visualizar no CPUlator, pode armazenar em memória
+LDR R3, =RESULT @ endereço de armazenamento
+STR R0, [R3] @ salva fatorial em RESULT
+B . @ fim do programa (loop infinito)
+.data
+RESULT: .word 0 @ espaço reservado para o resultado

@@ -1,0 +1,22 @@
+# Programa de Teste 4
+# Implementação da Série de Fibonacci
+# Baseado no código Python fornecido
+
+print("Série de Fibonacci com 5 termos")
+
+var n: number = 5
+var a: number = 0
+var b: number = 1
+var i: number = 0
+
+# Imprimir série de Fibonacci
+print("Série de Fibonacci com", n, "termos:")
+
+while(i < n)
+{
+  print(a)
+  var proximo: number = a + b
+  a = b
+  b = proximo
+  i = i + 1
+}

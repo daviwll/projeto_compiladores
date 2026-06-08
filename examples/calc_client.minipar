@@ -1,0 +1,32 @@
+# Calculator Client
+# Run this in another terminal after starting the server
+
+print("Starting Calculator Client...")
+
+# Connect to server
+c_channel calculadora_client {"localhost", 5000}
+
+print("")
+print("Testing calculator operations:")
+print("==============================")
+
+# Test operations (results will be printed directly)
+print("Sending: 10 + 5")
+calculadora_client.send("+", 10, 5)
+
+print("Sending: 20 - 8")
+calculadora_client.send("-", 20, 8)
+
+print("Sending: 6 * 7")
+calculadora_client.send("*", 6, 7)
+
+print("Sending: 100 / 4")
+calculadora_client.send("/", 100, 4)
+
+print("")
+print("All tests completed!")
+
+# Close connection
+calculadora_client.close()
+
+print("Connection closed.")

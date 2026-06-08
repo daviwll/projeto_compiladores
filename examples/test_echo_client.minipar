@@ -1,0 +1,29 @@
+# Simple Echo Client
+# Run this SECOND in another terminal (after starting the server)
+
+print("Starting Simple Echo Client...")
+
+# Connect to server
+c_channel echo_client {"localhost", 5001}
+
+print("")
+print("Testing echo operations:")
+print("========================")
+
+# Test sending messages
+print("Sending: Hello")
+echo_client.send("Hello")
+
+print("Sending: World")
+echo_client.send("World")
+
+print("Sending: Testing 123")
+echo_client.send("Testing 123")
+
+print("")
+print("All tests completed!")
+
+# Close connection
+echo_client.close()
+
+print("Connection closed.")
