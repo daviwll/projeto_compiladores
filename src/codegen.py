@@ -20,21 +20,32 @@ class TAC:
     
     def __repr__(self):
         if self.op == 'CALL':
-            # CALL nome_funcao n_args resultado
             return f"{self.op} {self.arg1} {self.arg2} {self.result}"
         elif self.op == 'INDEX':
-            # INDEX object index result
             return f"{self.result} = {self.arg1}[{self.arg2}]"
         elif self.op == 'CHANNEL_CREATE':
-            # CHANNEL_CREATE channel_type name args
             return f"{self.op} {self.arg1} {self.arg2} {{{self.result}}}"
         elif self.op == 'METHOD_CALL':
-            # METHOD_CALL object method result
-            return f"{self.op} {self.arg1}.{self.arg2} {self.result}"
+            return f"{self.result} = CALL_METHOD {self.arg1}.{self.arg2}"
+        elif self.op == 'METHOD_ARGS':
+            return f"  [args: {self.arg1}]"
+        elif self.op == 'CLASS_BEGIN':
+            return f"CLASS_BEGIN {self.arg1}"
+        elif self.op == 'CLASS_END':
+            return f"CLASS_END {self.arg1}"
+        elif self.op == 'FIELD':
+            suffix = f" = {self.result}" if self.result is not None else ""
+            return f"  FIELD {self.arg1} : {self.arg2}{suffix}"
+        elif self.op == 'NEW_OBJECT':
+            return f"{self.result} = NEW {self.arg1}({self.arg2} args)"
+        elif self.op == 'MEMBER_ACCESS':
+            return f"{self.result} = {self.arg1}.{self.arg2}"
+        elif self.op == 'MEMBER_STORE':
+            return f"{self.arg1}.{self.arg2} = {self.result}"
         elif self.op in ['LABEL', 'GOTO', 'PARAM', 'RETURN', 'FUNC_BEGIN', 'FUNC_END',
                          'SEQ_BEGIN', 'SEQ_END', 'PAR_BEGIN', 'PAR_END',
-                         'THREAD_START', 'THREAD_END', 'METHOD_ARGS']:
-            if self.arg1:
+                         'THREAD_START', 'THREAD_END']:
+            if self.arg1 is not None:
                 return f"{self.op} {self.arg1}"
             return self.op
         elif self.op in ['IF_FALSE', 'IF_TRUE']:
@@ -55,8 +66,9 @@ class CodeGenerator:
         self.temp_count = 0
         self.label_count = 0
         self.symbol_table: Dict[str, str] = {}
-        # Stack to track loop labels for break/continue
         self.loop_stack: List[tuple] = []  # [(start_label, end_label), ...]
+        self.current_class: Optional[str] = None
+        self.current_class_fields: List = []
     
     def new_temp(self) -> str:
         """Generate a new temporary variable"""
@@ -86,6 +98,86 @@ class CodeGenerator:
     def gen_Program(self, node: Program) -> None:
         for decl in node.declarations:
             self.generate(decl)
+
+    def _literal_value(self, node: ASTNode) -> Optional[str]:
+        """Return the string representation of a literal node, or None for computed expressions."""
+        if isinstance(node, NumberLiteral):
+            return str(node.value)
+        if isinstance(node, StringLiteral):
+            return f'"{node.value}"'
+        if isinstance(node, BoolLiteral):
+            return str(node.value).lower()
+        return None
+
+    def gen_ClassDecl(self, node: 'ClassDecl') -> None:
+        """Emit class structure header then each method/constructor as a function."""
+        self.current_class = node.name
+        self.current_class_fields = node.fields
+
+        header = node.name if not node.base_class else f"{node.name} extends {node.base_class}"
+        self.emit('CLASS_BEGIN', header)
+
+        for field in node.fields:
+            default = self._literal_value(field.initializer) if field.initializer else None
+            self.emit('FIELD', field.name, field.type, default)
+
+        self.emit('CLASS_END', node.name)
+
+        # Emit a default constructor when none is declared but fields need initialization
+        has_ctor = any(isinstance(m, ConstructorDecl) for m in node.methods)
+        if not has_ctor:
+            self._emit_default_ctor(node.name, node.fields)
+
+        for member in node.methods:
+            self.generate(member)
+
+        self.current_class = None
+        self.current_class_fields = []
+
+    def _emit_default_ctor(self, class_name: str, fields: List) -> None:
+        """Emit an implicit constructor that applies field initializers."""
+        func_name = f"{class_name}_ctor"
+        self.emit('FUNC_BEGIN', func_name)
+        self.emit('PARAM', 'this')
+        for field in fields:
+            if field.initializer:
+                value = self.generate(field.initializer)
+                self.emit('MEMBER_STORE', 'this', field.name, value)
+        self.emit('RETURN', 'this')
+        self.emit('FUNC_END', func_name)
+
+    def gen_FieldDecl(self, node: 'FieldDecl') -> None:
+        return None  # handled inside gen_ClassDecl
+
+    def gen_MethodDecl(self, node: 'MethodDecl') -> None:
+        if not self.current_class:
+            return None
+        func_name = f"{self.current_class}_{node.name}"
+        self.emit('FUNC_BEGIN', func_name)
+        self.emit('PARAM', 'this')
+        for param in node.parameters:
+            self.symbol_table[param.name] = param.type
+            self.emit('PARAM', param.name)
+        self.generate(node.body)
+        self.emit('FUNC_END', func_name)
+
+    def gen_ConstructorDecl(self, node: 'ConstructorDecl') -> None:
+        if not self.current_class:
+            return None
+        func_name = f"{self.current_class}_ctor"
+        self.emit('FUNC_BEGIN', func_name)
+        self.emit('PARAM', 'this')
+        for param in node.parameters:
+            self.symbol_table[param.name] = param.type
+            self.emit('PARAM', param.name)
+        # Field initializers run before the constructor body
+        for field in self.current_class_fields:
+            if field.initializer:
+                value = self.generate(field.initializer)
+                self.emit('MEMBER_STORE', 'this', field.name, value)
+        self.generate(node.body)
+        self.emit('RETURN', 'this')
+        self.emit('FUNC_END', func_name)
     
     def gen_VarDecl(self, node: VarDecl) -> None:
         self.symbol_table[node.name] = node.type
@@ -228,6 +320,12 @@ class CodeGenerator:
         self.generate(node.expression)
     
     def gen_Assignment(self, node: Assignment) -> str:
+        if self.current_class:
+            field_names = {f.name for f in self.current_class_fields}
+            if node.name in field_names:
+                value = self.generate(node.value)
+                self.emit('MEMBER_STORE', 'this', node.name, value)
+                return value
         value = self.generate(node.value)
         self.emit('ASSIGN', value, None, node.name)
         return node.name
@@ -255,6 +353,12 @@ class CodeGenerator:
         return result
     
     def gen_Variable(self, node: Variable) -> str:
+        if self.current_class:
+            field_names = {f.name for f in self.current_class_fields}
+            if node.name in field_names:
+                result = self.new_temp()
+                self.emit('MEMBER_ACCESS', 'this', node.name, result)
+                return result
         return node.name
     
     def gen_NumberLiteral(self, node: NumberLiteral) -> str:
@@ -340,6 +444,10 @@ class CodeGenerator:
     
     def gen_MethodCall(self, node: 'MethodCall') -> str:
         """Generate code for method call - obj.method(args)"""
+        receiver = node.object
+        if isinstance(receiver, ASTNode):
+            receiver = self.generate(receiver)
+
         # Generate code for arguments
         for arg in node.arguments:
             arg_result = self.generate(arg)
@@ -347,9 +455,35 @@ class CodeGenerator:
 
         # Generate method call instruction
         result = self.new_temp()
-        self.emit('METHOD_CALL', node.object, node.method, result)
+        self.emit('METHOD_CALL', receiver, node.method, result)
         self.emit('METHOD_ARGS', len(node.arguments))
         return result
+
+    def gen_ObjectCreation(self, node: 'ObjectCreation') -> str:
+        result = self.new_temp()
+        for arg in node.arguments:
+            arg_result = self.generate(arg)
+            self.emit('PARAM', arg_result)
+        self.emit('NEW_OBJECT', node.class_name, len(node.arguments), result)
+        return result
+
+    def gen_MemberAssignment(self, node: 'MemberAssignment') -> str:
+        obj = self.generate(node.object)
+        value = self.generate(node.value)
+        self.emit('MEMBER_STORE', obj, node.member, value)
+        return value
+
+    def gen_MemberAccess(self, node: 'MemberAccess') -> str:
+        obj = self.generate(node.object)
+        result = self.new_temp()
+        self.emit('MEMBER_ACCESS', obj, node.member, result)
+        return result
+
+    def gen_ThisRef(self, node: 'ThisRef') -> str:
+        return 'this'
+
+    def gen_SuperRef(self, node: 'SuperRef') -> str:
+        return 'super'
 
     def gen_IndexAccess(self, node: 'IndexAccess') -> str:
         """Generate code for index access - arr[index]"""

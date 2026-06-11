@@ -1,14 +1,17 @@
 # Compilador Minipar
 
-Um compilador completo para a linguagem Minipar com **runtime executor** e suporte a **comunicação distribuída via canais**.
+Um compilador completo para a linguagem **Minipar 2026.1** com suporte a **orientação a objetos**, **execução paralela**, **canais de comunicação**, geração de **código intermediário TAC**, código **C**, assembly **ARMv7** (CPUlator Web) e executáveis nativos.
 
 ## 🎯 Principais Recursos
 
-✅ **Web Interface** - Interface gráfica com Gradio ⭐ **NOVO**  
+✅ **Orientação a Objetos** - Classes, campos, métodos, construtores, herança (`extends`), `this`, `super`  
+✅ **Web Interface** - Interface gráfica com Gradio  
 ✅ **Compilador Frontend** - Lexer, Parser, Análise Semântica, Geração de Código  
 ✅ **Runtime Executor** - Execute programas Minipar diretamente  
 ✅ **Canais de Comunicação** - Cliente-servidor com sockets  
-✅ **Backend C/Assembly** - Compile para executáveis nativos  
+✅ **Backend ARMv7** - Assembly para CPUlator Web com alocador de heap estático  
+✅ **Backend C** - Código C com structs, `malloc`, e acesso via `->` para validação semântica  
+✅ **Backend Executável** - Compile para binário nativo via GCC  
 ✅ **Documentação Completa** - Tutoriais e guias técnicos  
 
 ## 📋 Estrutura do Projeto
@@ -362,6 +365,51 @@ client.close()
 /* Multi-linha */
 ```
 
+### Classes e Objetos (OO)
+
+```minipar
+# Declaração de classe
+class Counter {
+    var value: number = 0
+
+    constructor(start: number) {
+        value = start
+    }
+
+    func inc() -> number {
+        value = value + 1
+        return value
+    }
+
+    func get() -> number {
+        return value
+    }
+}
+
+# Criação de objeto
+var c: Counter = new Counter(0)
+
+# Chamada de método
+c.inc()
+c.get()
+
+# Acesso e escrita de campo
+c.value = 10
+
+# Herança
+class Animal {
+    func speak() -> string { return "..." }
+}
+
+class Dog extends Animal {
+    func fetch() -> string { return "fetching!" }
+}
+
+var d: Dog = new Dog()
+d.speak()    # método herdado de Animal
+d.fetch()    # método próprio de Dog
+```
+
 ### Operadores
 - **Aritméticos**: `+` `-` `*` `/` `%`
 - **Comparação**: `==` `!=` `<` `>` `<=` `>=`
@@ -374,33 +422,33 @@ Código Minipar (.minipar)
          ↓
     Lexer → Tokens
          ↓
-    Parser → AST
+    Parser → AST  (classes, campos, métodos, herança)
          ↓
-  Semantic → Validated AST
+  Semantic → AST validado (tipos OO, herança, arity)
          ↓
-   ┌──────┴──────┐
-   ↓             ↓
-Codegen      Runner
-(TAC)       (Execute)
-   ↓             ↓
-C Codegen    Results
+   Codegen → TAC  (CLASS_BEGIN, FIELD, NEW_OBJECT,
+         ↓         MEMBER_ACCESS, MEMBER_STORE, METHOD_CALL)
+   ┌──────┼──────┐
+   ↓      ↓     ↓
+ARM     C Gen  Runner
+(CPUlator)  (structs) (Execute)
+output.s  output.c  Results
    ↓
-Backend
-(GCC)
-   ↓
-Executable
+Backend/GCC → Executável
 ```
 
 ### Componentes
 
 | Módulo | Responsabilidade |
 |--------|-----------------|
-| **lexer.py** | Tokenização |
-| **parser.py** | Análise sintática |
-| **ast_nodes.py** | Estrutura AST |
-| **semantic.py** | Análise semântica |
-| **codegen.py** | Geração TAC |
-| **c_codegen.py** | Geração C |
+| **lexer.py** | Tokenização (inclui `class`, `new`, `this`, `super`, `extends`, `constructor`) |
+| **parser.py** | Análise sintática (declarações OO, `new`, acesso de membro) |
+| **ast_nodes.py** | Nós AST OO: `ClassDecl`, `FieldDecl`, `MethodDecl`, `ObjectCreation`, `MemberAccess` |
+| **semantic.py** | Análise semântica com escopo de classe, herança, checagem de arity |
+| **symbol_table.py** | Símbolos OO: class, field, method, constructor, object instance |
+| **codegen.py** | Geração TAC com opcodes OO |
+| **c_codegen.py** | Geração C: structs, `malloc`, `this->field`, funções com receptor |
+| **arm_codegen.py** | Geração ARMv7 para CPUlator: alocador bump, offsets de campo, `ldr`/`str` |
 | **backend.py** | Compilação GCC |
 | **runner.py** | Execução runtime |
 
@@ -418,13 +466,15 @@ py src\runner.py test_runner_simple.minipar
 ```
 
 **Cobertura**:
-- ✅ Lexer (tokenização)
-- ✅ Parser (AST)
-- ✅ Semantic (tipos, escopo)
-- ✅ Codegen (TAC)
-- ✅ C Codegen (código C)
+- ✅ Lexer (tokenização + keywords OO)
+- ✅ Parser (AST + declarações OO)
+- ✅ Semantic (tipos, escopo, validação OO)
+- ✅ Codegen (TAC + opcodes OO)
+- ✅ C Codegen (structs, malloc, acesso de campo)
+- ✅ ARM Codegen (CPUlator: alocador, offsets, dispatch)
 - ✅ Runner (execução)
 - ✅ Canais (networking)
+- ✅ Testes de aceitação OO (fixture + erros semânticos)
 
 ## 🤝 Contribuindo
 

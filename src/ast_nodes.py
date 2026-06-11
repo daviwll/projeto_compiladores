@@ -2,7 +2,7 @@
 Abstract Syntax Tree Node Definitions for Minipar Language
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional, Any
 
 
@@ -15,6 +15,36 @@ class ASTNode:
 @dataclass
 class Program(ASTNode):
     declarations: List[ASTNode]
+
+
+@dataclass
+class ClassDecl(ASTNode):
+    name: str
+    base_class: Optional[str] = None
+    fields: List[ASTNode] = field(default_factory=list)
+    methods: List[ASTNode] = field(default_factory=list)
+
+
+@dataclass
+class FieldDecl(ASTNode):
+    type: str
+    name: str
+    initializer: Optional[ASTNode] = None
+
+
+@dataclass
+class MethodDecl(ASTNode):
+    return_type: str
+    name: str
+    parameters: List['VarDecl']
+    body: 'Block'
+
+
+@dataclass
+class ConstructorDecl(ASTNode):
+    name: str
+    parameters: List['VarDecl']
+    body: 'Block'
 
 
 @dataclass
@@ -166,9 +196,39 @@ class ParBlock(ASTNode):
 @dataclass
 class MethodCall(ASTNode):
     """Method call on an object - obj.method(args)"""
-    object: str  # Object name
+    object: Any  # Object receiver (variable name or expression)
     method: str  # Method name
     arguments: List[ASTNode]  # Method arguments
+
+
+@dataclass
+class ObjectCreation(ASTNode):
+    class_name: str
+    arguments: List[ASTNode]
+
+
+@dataclass
+class MemberAccess(ASTNode):
+    object: ASTNode
+    member: str
+
+
+@dataclass
+class MemberAssignment(ASTNode):
+    """Assignment to an object member: obj.field = value"""
+    object: ASTNode
+    member: str
+    value: ASTNode
+
+
+@dataclass
+class ThisRef(ASTNode):
+    pass
+
+
+@dataclass
+class SuperRef(ASTNode):
+    pass
 
 
 @dataclass

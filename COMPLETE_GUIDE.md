@@ -11,7 +11,9 @@
 3. [Compiler Flags Reference](#compiler-flags-reference)
 4. [Feature Tutorials](#feature-tutorials)
 5. [Complete Examples](#complete-examples)
-6. [Troubleshooting](#troubleshooting)
+6. [Object-Oriented Programming](#object-oriented-programming)
+7. [ARM Assembly and CPUlator](#arm-assembly-and-cpulator)
+8. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -856,6 +858,202 @@ while (true) {
 ```minipar
 print(value1, value2, ...)    # Print values to console
 ```
+
+---
+
+## 🏛️ Object-Oriented Programming
+
+MINIPAR 2026.1 supports full object-oriented programming with classes, fields, methods, constructors, and inheritance.
+
+### Declaring a Class
+
+```minipar
+class ClassName {
+    # Fields (state)
+    var fieldName: type = defaultValue
+
+    # Constructor (optional, runs on new)
+    constructor(param: type) {
+        fieldName = param
+    }
+
+    # Methods
+    func methodName(param: type) -> returnType {
+        return expression
+    }
+}
+```
+
+### Creating Objects
+
+```minipar
+# No-arg constructor (default)
+var obj: ClassName = new ClassName()
+
+# With constructor arguments
+var obj: ClassName = new ClassName(arg1, arg2)
+```
+
+### Accessing Members
+
+```minipar
+# Call a method
+obj.methodName(arg)
+
+# Read a field
+obj.fieldName
+
+# Write a field
+obj.fieldName = value
+```
+
+### `this` and `super`
+
+Inside a method or constructor, `this` refers to the current instance. When accessing fields from within the same class, the name can be used directly without `this.`:
+
+```minipar
+class Counter {
+    var value: number = 0
+    func inc() -> number {
+        value = value + 1    # 'value' implicitly means this.value
+        return value
+    }
+}
+```
+
+### Inheritance
+
+```minipar
+class Animal {
+    var name: string = "unknown"
+    func speak() -> string {
+        return "..."
+    }
+}
+
+class Dog extends Animal {
+    func fetch() -> string {
+        return "fetching!"
+    }
+}
+
+var d: Dog = new Dog()
+d.speak()     # inherited from Animal
+d.fetch()     # defined in Dog
+```
+
+### Full OO Example
+
+```minipar
+class Counter {
+    var value: number = 0
+
+    constructor(start: number) {
+        value = start
+    }
+
+    func inc() -> number {
+        value = value + 1
+        return value
+    }
+
+    func reset() -> void {
+        value = 0
+    }
+
+    func get() -> number {
+        return value
+    }
+}
+
+var c: Counter = new Counter(0)
+c.inc()
+c.inc()
+c.inc()
+c.get()     # returns 3
+c.reset()
+c.get()     # returns 0
+```
+
+### How OO Programs Are Compiled
+
+The compiler translates OO programs through all stages:
+
+1. **TAC**: `CLASS_BEGIN Counter`, `FIELD value`, `NEW_OBJECT`, `METHOD_CALL`, `MEMBER_ACCESS`, `MEMBER_STORE`
+2. **C Backend**: structs with `typedef struct`, `malloc(sizeof(Counter))`, `this->value`, `Counter_ctor(t, args...)`
+3. **ARM Backend**: bump-allocator `__minipar_malloc`, field reads via `ldr r0, [obj, #offset]`, field writes via `str r0, [obj, #offset]`, method calls via `bl ClassName_method`
+
+### OO Semantic Checks
+
+The compiler enforces:
+- Duplicate fields or methods in the same class → error
+- Duplicate constructor → error
+- Object creation with wrong number of arguments → error
+- Call to undefined method → error
+- Access to undefined field → error
+- Inheritance from undefined class → error
+- Valid inheritance: child class can call parent methods
+
+---
+
+## 🔧 ARM Assembly and CPUlator
+
+ARM assembly is generated automatically whenever you compile a Minipar program (unless you pass `--no-asm`).
+
+### Generated File
+
+```
+output.s    # ARMv7 assembly, one file per compilation
+```
+
+### Running in CPUlator Web
+
+1. Open [CPUlator Web](https://cpulator.01xz.net/?sys=arm-de1soc) (ARM A9 bare-metal target)
+2. Copy the contents of `output.s`
+3. Paste into the CPUlator editor
+4. Click **Compile and Load**
+5. Click **Continue** to run
+
+### ARM Output Structure
+
+```asm
+.data
+    x:    .word 0          @ global variables
+    __heap_ptr: .word 0    @ (OO only) bump-allocator pointer
+    __heap:     .skip 4096 @ (OO only) 4KB object heap
+
+.text
+    .global main
+_start:
+    bl main
+    mov r7, #1      @ exit
+    svc #0
+
+main:               @ top-level program code
+    ...
+
+ClassName_ctor:     @ (OO) constructor
+    ...
+ClassName_method:   @ (OO) method with this in r0
+    ...
+
+__minipar_malloc:   @ (OO only) bump allocator
+    ...
+```
+
+### Calling Convention (AAPCS)
+
+- `r0–r3`: arguments and return value
+- `r4–r7`: callee-saved (preserved across calls)
+- Methods receive `this` in `r0`
+- Fields are stored as 4-byte words at offset `field_index * 4`
+
+### ARM Flags
+
+| Flag | Effect |
+|------|--------|
+| *(default)* | Generate `output.s` |
+| `--no-asm` | Skip ARM assembly generation |
 
 ---
 

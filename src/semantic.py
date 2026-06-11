@@ -3,7 +3,7 @@ Semantic Analyzer for Minipar Language
 Performs type checking and semantic validation
 """
 
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 try:
     from src.ast_nodes import *
     from src.symbol_table import SymbolTable, SymbolType, Symbol
@@ -25,6 +25,8 @@ class SemanticAnalyzer:
         self.errors: List[str] = []
         self.current_function_return_type: Optional[str] = None
         self.in_loop = False  # Track if we're inside a loop (for break/continue)
+        self.current_class: Optional[str] = None
+        self.class_registry: Dict[str, Dict[str, Any]] = {}
         
         # Built-in functions
         self._initialize_builtins()
@@ -89,6 +91,156 @@ class SemanticAnalyzer:
         """Visit program node"""
         for declaration in node.declarations:
             self.visit(declaration)
+
+    def visit_ClassDecl(self, node: 'ClassDecl') -> None:
+        """Visit class declaration"""
+        if self.symbol_table.lookup_local(node.name):
+            self.add_error(f"Class '{node.name}' already declared in current scope")
+            return
+
+        if node.name in self.class_registry:
+            self.add_error(f"Class '{node.name}' already declared")
+            return
+
+        if node.base_class and node.base_class not in self.class_registry:
+            self.add_error(f"Base class '{node.base_class}' not declared before '{node.name}'")
+
+        self.symbol_table.add_symbol(
+            node.name, SymbolType.CLASS, node.name,
+            line=0, is_initialized=True, base_class=node.base_class
+        )
+
+        self.class_registry[node.name] = {
+            'base_class': node.base_class,
+            'fields': {},
+            'methods': {},
+            'constructor': None,
+        }
+
+        previous_class = self.current_class
+        self.current_class = node.name
+
+        self.symbol_table.enter_scope(f"class_{node.name}")
+
+        for field in node.fields:
+            self.visit(field)
+
+        for member in node.methods:
+            self.visit(member)
+
+        self.symbol_table.exit_scope()
+        self.current_class = previous_class
+
+    def visit_FieldDecl(self, node: 'FieldDecl') -> None:
+        """Visit class field declaration"""
+        if not self.current_class:
+            return None
+
+        class_info = self.class_registry[self.current_class]
+        if node.name in class_info['fields']:
+            self.add_error(f"Field '{node.name}' already declared in class '{self.current_class}'")
+            return
+
+        if self.symbol_table.lookup_local(node.name):
+            self.add_error(f"Field '{node.name}' already declared in class scope")
+            return
+
+        if node.initializer:
+            init_type = self.visit(node.initializer)
+            if not self.is_type_compatible(node.type, init_type):
+                self.add_error(
+                    f"Type mismatch: cannot assign {init_type} to {node.type} for field '{node.name}'"
+                )
+
+        class_info['fields'][node.name] = node.type
+        self.symbol_table.add_symbol(
+            node.name, SymbolType.FIELD, node.type,
+            line=0, is_initialized=(node.initializer is not None)
+        )
+
+    def visit_MethodDecl(self, node: 'MethodDecl') -> None:
+        """Visit class method declaration"""
+        if not self.current_class:
+            return None
+
+        class_info = self.class_registry[self.current_class]
+        if node.name in class_info['methods']:
+            self.add_error(f"Method '{node.name}' already declared in class '{self.current_class}'")
+            return
+
+        param_types = [param.type for param in node.parameters]
+        class_info['methods'][node.name] = {
+            'return_type': node.return_type,
+            'param_types': param_types,
+        }
+
+        self.symbol_table.add_symbol(
+            node.name, SymbolType.METHOD, node.return_type,
+            line=0, is_initialized=True,
+            param_types=param_types, return_type=node.return_type
+        )
+
+        self.symbol_table.enter_scope(f"method_{node.name}")
+        self.symbol_table.add_symbol(
+            'this', SymbolType.INSTANCE, self.current_class,
+            line=0, is_initialized=True
+        )
+
+        for field_name, field_type in class_info['fields'].items():
+            self.symbol_table.add_symbol(
+                field_name, SymbolType.FIELD, field_type,
+                line=0, is_initialized=True
+            )
+
+        for param in node.parameters:
+            if self.symbol_table.lookup_local(param.name):
+                self.add_error(f"Parameter '{param.name}' already declared")
+            else:
+                self.symbol_table.add_symbol(
+                    param.name, SymbolType.PARAMETER, param.type,
+                    line=0, is_initialized=True
+                )
+
+        previous_return_type = self.current_function_return_type
+        self.current_function_return_type = node.return_type
+        self.visit(node.body)
+        self.current_function_return_type = previous_return_type
+        self.symbol_table.exit_scope()
+
+    def visit_ConstructorDecl(self, node: 'ConstructorDecl') -> None:
+        """Visit class constructor declaration"""
+        if not self.current_class:
+            return None
+
+        class_info = self.class_registry[self.current_class]
+        if class_info['constructor'] is not None:
+            self.add_error(f"Class '{self.current_class}' already has a constructor")
+            return
+
+        param_types = [param.type for param in node.parameters]
+        class_info['constructor'] = {
+            'param_types': param_types,
+            'return_type': self.current_class,
+        }
+
+        self.symbol_table.add_symbol(
+            node.name, SymbolType.CONSTRUCTOR, self.current_class,
+            line=0, is_initialized=True,
+            param_types=param_types, return_type=self.current_class
+        )
+
+        self.symbol_table.enter_scope(f"ctor_{node.name}")
+        for param in node.parameters:
+            if self.symbol_table.lookup_local(param.name):
+                self.add_error(f"Parameter '{param.name}' already declared")
+            else:
+                self.symbol_table.add_symbol(
+                    param.name, SymbolType.PARAMETER, param.type,
+                    line=0, is_initialized=True
+                )
+
+        self.visit(node.body)
+        self.symbol_table.exit_scope()
     
     def visit_VarDecl(self, node: VarDecl) -> None:
         """Visit variable declaration"""
@@ -426,16 +578,26 @@ class SemanticAnalyzer:
     
     def visit_MethodCall(self, node: MethodCall) -> str:
         """Visit method call"""
-        # Look up object
-        symbol = self.symbol_table.lookup(node.object)
-        if not symbol:
-            self.add_error(f"Undefined object '{node.object}'")
-            return "any"
+        symbol = None
+        obj_type = "any"
 
-        obj_type = symbol.data_type
+        if isinstance(node.object, Variable):
+            symbol = self.symbol_table.lookup(node.object.name)
+            if not symbol:
+                self.add_error(f"Undefined object '{node.object.name}'")
+                return "any"
+            obj_type = symbol.data_type
+        elif isinstance(node.object, str):
+            symbol = self.symbol_table.lookup(node.object)
+            if not symbol:
+                self.add_error(f"Undefined object '{node.object}'")
+                return "any"
+            obj_type = symbol.data_type
+        else:
+            obj_type = self.visit(node.object)
 
         # For channels, allow send, receive, close methods
-        if symbol.symbol_type == SymbolType.CHANNEL:
+        if symbol and symbol.symbol_type == SymbolType.CHANNEL:
             if node.method in ['send', 'receive', 'close']:
                 if node.method == 'send':
                     return "string"  # send returns response string from server
@@ -525,8 +687,117 @@ class SemanticAnalyzer:
                 self.add_error(f"Unknown method '{node.method}' for string")
                 return "any"
 
-        # For other types, method calls not yet supported
-        self.add_error(f"Method calls not supported for type {obj_type}")
+        if obj_type in self.class_registry:
+            found = self._lookup_member(obj_type, node.method)
+            if found is None or found[0] != 'method':
+                self.add_error(f"Unknown method '{node.method}' for class '{obj_type}'")
+                for arg in node.arguments:
+                    self.visit(arg)
+                return "any"
+
+            _, member = found
+            expected_arg_count = len(member['param_types'])
+            if len(node.arguments) != expected_arg_count:
+                self.add_error(
+                    f"Method '{node.method}' expects {expected_arg_count} arguments, got {len(node.arguments)}"
+                )
+
+            for i, arg in enumerate(node.arguments):
+                arg_type = self.visit(arg)
+                if i < len(member['param_types']):
+                    expected_type = member['param_types'][i]
+                    if expected_type != "any" and not self.is_type_compatible(expected_type, arg_type):
+                        self.add_error(
+                            f"Argument {i+1} to '{node.method}': expected {expected_type}, got {arg_type}"
+                        )
+
+            return member['return_type']
+
+        # For other types, allow the call for now so class/object syntax can parse.
+        for arg in node.arguments:
+            self.visit(arg)
+        return "any"
+
+    def visit_ObjectCreation(self, node: 'ObjectCreation') -> str:
+        """Visit object creation"""
+        class_info = self.class_registry.get(node.class_name)
+        if class_info is None:
+            self.add_error(f"Undefined class '{node.class_name}'")
+            for arg in node.arguments:
+                self.visit(arg)
+            return "any"
+
+        for arg in node.arguments:
+            self.visit(arg)
+
+        constructor = class_info.get('constructor')
+        if constructor is not None:
+            expected_arg_count = len(constructor['param_types'])
+            if len(node.arguments) != expected_arg_count:
+                self.add_error(
+                    f"Constructor for '{node.class_name}' expects {expected_arg_count} arguments, got {len(node.arguments)}"
+                )
+        elif node.arguments:
+            self.add_error(f"Class '{node.class_name}' does not define a constructor")
+
+        return node.class_name
+
+    def _lookup_member(self, class_name: str, member: str):
+        """Walk the inheritance chain to find a field or method. Returns (kind, info) or None."""
+        cls = class_name
+        while cls and cls in self.class_registry:
+            info = self.class_registry[cls]
+            if member in info['fields']:
+                return ('field', info['fields'][member])
+            if member in info['methods']:
+                return ('method', info['methods'][member])
+            cls = info.get('base_class')
+        return None
+
+    def visit_MemberAccess(self, node: 'MemberAccess') -> str:
+        """Visit member access"""
+        receiver_type = self.visit(node.object)
+        if receiver_type in self.class_registry:
+            found = self._lookup_member(receiver_type, node.member)
+            if found is None:
+                self.add_error(f"Unknown member '{node.member}' for class '{receiver_type}'")
+                return "any"
+            kind, info = found
+            return info if kind == 'field' else info['return_type']
+        return "any"
+
+    def visit_MemberAssignment(self, node: 'MemberAssignment') -> str:
+        """Visit member assignment: obj.field = value"""
+        receiver_type = self.visit(node.object)
+        value_type = self.visit(node.value)
+
+        if receiver_type in self.class_registry:
+            found = self._lookup_member(receiver_type, node.member)
+            if found is None:
+                self.add_error(f"Unknown member '{node.member}' for class '{receiver_type}'")
+                return "any"
+            kind, info = found
+            if kind != 'field':
+                self.add_error(f"Cannot assign to method '{node.member}'")
+                return "any"
+            field_type = info
+            if not self.is_type_compatible(field_type, value_type):
+                self.add_error(
+                    f"Type mismatch: cannot assign {value_type} to {field_type} "
+                    f"for member '{node.member}'"
+                )
+            return field_type
+        return "any"
+
+    def visit_ThisRef(self, node: 'ThisRef') -> str:
+        """Visit this reference"""
+        return self.current_class or "any"
+
+    def visit_SuperRef(self, node: 'SuperRef') -> str:
+        """Visit super reference"""
+        if self.current_class:
+            base_class = self.class_registry.get(self.current_class, {}).get('base_class')
+            return base_class or "any"
         return "any"
 
     def visit_Variable(self, node: Variable) -> str:
@@ -643,14 +914,20 @@ class SemanticAnalyzer:
     # ========== Helper Methods ==========
     
     def is_type_compatible(self, expected: str, actual: str) -> bool:
-        """Check if types are compatible"""
+        """Check if types are compatible, including class hierarchy."""
         if expected == actual:
             return True
         if expected == "any" or actual == "any":
             return True
-        # bool can be used as number (0 or 1)
         if expected == "number" and actual == "bool":
             return True
+        # Walk the inheritance chain: actual is compatible with expected if actual inherits from expected
+        cls = actual
+        while cls and cls in self.class_registry:
+            base = self.class_registry[cls].get('base_class')
+            if base == expected:
+                return True
+            cls = base
         return False
 
     def _has_return_statement(self, node: ASTNode) -> bool:

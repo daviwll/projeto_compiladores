@@ -111,6 +111,56 @@ while (i < 10) {
 }
 ```
 
+### Classes and Objects (OO)
+```minipar
+# Class with field, constructor, and methods
+class Counter {
+    var value: number = 0
+
+    constructor(start: number) {
+        value = start
+    }
+
+    func inc() -> number {
+        value = value + 1
+        return value
+    }
+
+    func get() -> number {
+        return value
+    }
+}
+
+# Object creation
+var c: Counter = new Counter(0)
+
+# Method call
+c.inc()
+
+# Field read / write
+c.get()
+c.value = 10
+
+# Inheritance
+class Animal {
+    func speak() -> string { return "..." }
+}
+class Dog extends Animal {}   # inherits speak()
+
+var d: Dog = new Dog()
+d.speak()
+```
+
+### OO Keywords
+| Keyword | Purpose |
+|---------|---------|
+| `class` | Declare a class |
+| `constructor` | Class initializer |
+| `new` | Create an object instance |
+| `this` | Reference to current object |
+| `super` | Reference to parent class |
+| `extends` | Inheritance |
+
 ### Channels (Networking)
 ```minipar
 # Server

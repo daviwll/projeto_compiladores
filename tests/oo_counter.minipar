@@ -1,0 +1,18 @@
+# OO acceptance fixture: Counter class with field, two methods, and field assignment
+class Counter {
+    var value: number = 0
+    func inc() -> number {
+        value = value + 1
+        return value
+    }
+    func get() -> number {
+        return value
+    }
+}
+
+var c: Counter = new Counter()
+c.inc()
+c.inc()
+c.get()
+c.value = 10
+c.get()

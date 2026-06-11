@@ -56,6 +56,8 @@ class Parser:
             return self.func_declaration()
         elif self.match(TokenType.VAR):
             return self.var_declaration()
+        elif self.match(TokenType.CLASS):
+            return self.class_declaration()
         elif self.match(TokenType.S_CHANNEL, TokenType.C_CHANNEL):
             return self.channel_declaration()
         elif self.match(TokenType.SEQ):
@@ -143,6 +145,69 @@ class Parser:
             self.advance()
         
         return ChannelDecl(channel_type, name, arguments)
+
+    def class_declaration(self) -> 'ClassDecl':
+        self.consume(TokenType.CLASS, "Expected 'class' keyword")
+        name = self.consume(TokenType.IDENTIFIER, "Expected class name").value
+
+        base_class = None
+        if self.match(TokenType.EXTENDS):
+            self.advance()
+            base_class = self.consume(TokenType.IDENTIFIER, "Expected base class name").value
+
+        self.consume(TokenType.LBRACE, "Expected '{' after class header")
+
+        fields = []
+        methods = []
+        while not self.match(TokenType.RBRACE) and not self.match(TokenType.EOF):
+            if self.match(TokenType.VAR):
+                fields.append(self.class_field_declaration())
+            elif self.match(TokenType.FUNC):
+                methods.append(self.class_method_declaration(name))
+            elif self.match(TokenType.CONSTRUCTOR):
+                methods.append(self.constructor_declaration(name))
+            else:
+                self.error("Expected class member declaration")
+
+        self.consume(TokenType.RBRACE, "Expected '}' after class body")
+        return ClassDecl(name, base_class, fields, methods)
+
+    def class_field_declaration(self) -> 'FieldDecl':
+        self.consume(TokenType.VAR, "Expected 'var' in class field declaration")
+        name = self.consume(TokenType.IDENTIFIER, "Expected field name").value
+        self.consume(TokenType.COLON, "Expected ':' after field name")
+        field_type = self.type_specifier()
+
+        initializer = None
+        if self.match(TokenType.ASSIGN):
+            self.advance()
+            initializer = self.expression()
+
+        if self.match(TokenType.SEMICOLON):
+            self.advance()
+
+        return FieldDecl(field_type, name, initializer)
+
+    def class_method_declaration(self, class_name: str) -> ASTNode:
+        method = self.func_declaration()
+        if method.name == class_name and method.return_type == 'void':
+            return ConstructorDecl(method.name, method.parameters, method.body)
+        return MethodDecl(method.return_type, method.name, method.parameters, method.body)
+
+    def constructor_declaration(self, class_name: str) -> 'ConstructorDecl':
+        self.consume(TokenType.CONSTRUCTOR, "Expected 'constructor' keyword")
+        self.consume(TokenType.LPAREN, "Expected '(' after constructor keyword")
+
+        parameters = []
+        if not self.match(TokenType.RPAREN):
+            parameters.append(self.parameter())
+            while self.match(TokenType.COMMA):
+                self.advance()
+                parameters.append(self.parameter())
+
+        self.consume(TokenType.RPAREN)
+        body = self.block()
+        return ConstructorDecl(class_name, parameters, body)
     
     def type_specifier(self) -> str:
         if self.match(TokenType.NUMBER):
@@ -172,6 +237,8 @@ class Parser:
         elif self.match(TokenType.ANY):
             self.advance()
             return 'any'
+        elif self.match(TokenType.IDENTIFIER):
+            return self.advance().value
         else:
             self.error("Expected type specifier")
     
@@ -332,6 +399,8 @@ class Parser:
             
             if isinstance(expr, Variable):
                 return Assignment(expr.name, value)
+            elif isinstance(expr, MemberAccess):
+                return MemberAssignment(expr.object, expr.member, value)
             else:
                 self.error("Invalid assignment target")
         
@@ -412,7 +481,7 @@ class Parser:
             # Handle method calls: obj.method()
             if self.match(TokenType.DOT):
                 self.advance()
-                method_name = self.consume(TokenType.IDENTIFIER, "Expected method name after '.'").value
+                member_name = self.consume(TokenType.IDENTIFIER, "Expected member name after '.'").value
 
                 if self.match(TokenType.LPAREN):
                     self.advance()
@@ -425,14 +494,9 @@ class Parser:
                             arguments.append(self.expression())
 
                     self.consume(TokenType.RPAREN)
-
-                    # Create MethodCall node
-                    if isinstance(expr, Variable):
-                        expr = MethodCall(expr.name, method_name, arguments)
-                    else:
-                        self.error("Method calls require a variable object")
+                    expr = MethodCall(expr, member_name, arguments)
                 else:
-                    self.error("Expected '(' after method name")
+                    expr = MemberAccess(expr, member_name)
 
             # Handle array/string indexing and slicing: arr[index] or arr[start:end]
             elif self.match(TokenType.LBRACKET):
@@ -514,6 +578,29 @@ class Parser:
         if self.match(TokenType.IDENTIFIER):
             name = self.advance().value
             return Variable(name)
+
+        if self.match(TokenType.NEW):
+            self.advance()
+            class_name = self.consume(TokenType.IDENTIFIER, "Expected class name after 'new'").value
+            self.consume(TokenType.LPAREN, "Expected '(' after class name")
+
+            arguments = []
+            if not self.match(TokenType.RPAREN):
+                arguments.append(self.expression())
+                while self.match(TokenType.COMMA):
+                    self.advance()
+                    arguments.append(self.expression())
+
+            self.consume(TokenType.RPAREN, "Expected ')' after constructor arguments")
+            return ObjectCreation(class_name, arguments)
+
+        if self.match(TokenType.THIS):
+            self.advance()
+            return ThisRef()
+
+        if self.match(TokenType.SUPER):
+            self.advance()
+            return SuperRef()
 
         if self.match(TokenType.LPAREN):
             self.advance()

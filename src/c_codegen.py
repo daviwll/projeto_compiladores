@@ -30,7 +30,11 @@ class CCodeGenerator:
         self.current_thread_id: Optional[int] = None
         self.pending_params: List[str] = []
         self.last_label: Optional[str] = None
-        self.current_local_vars: Dict[str, str] = {}  # Track local variable types in current function
+        self.current_local_vars: Dict[str, str] = {}
+        # OO support
+        self.classes: Dict[str, dict] = {}           # class_name -> {fields: [(name,type)], base: str}
+        self.var_types: Dict[str, str] = {}          # var_name -> class_name
+        self.method_class_map: Dict[str, str] = {}   # func_name -> class_name
     
     def indent(self) -> str:
         """Get current indentation"""
@@ -61,12 +65,17 @@ class CCodeGenerator:
         self.temp_vars = set()
         self.global_vars = {}
         self.function_signatures = {}
-        
-        # First pass: collect information about functions and variables
+        self.classes = {}
+        self.var_types = {}
+        self.method_class_map = {}
+
+        # First pass: collect information about functions, variables, and OO structure
+        self._analyze_oo_tac(tac_instructions)
         self._analyze_tac(tac_instructions)
-        
+
         # Generate C code
         self._generate_headers()
+        self._generate_struct_definitions()
         self._generate_forward_declarations()
         self._generate_global_variables()
         self._generate_functions(tac_instructions)
@@ -167,6 +176,53 @@ class CCodeGenerator:
         # Store temp destinations for use during code generation
         self.temp_destinations = temp_destinations
     
+    def _analyze_oo_tac(self, instructions: List[TAC]):
+        """First pass: collect class definitions, method map, and variable types."""
+        in_class = None
+        current_fields: List[tuple] = []
+        current_base: Optional[str] = None
+
+        for instr in instructions:
+            if instr.op == 'CLASS_BEGIN':
+                parts = str(instr.arg1).split(' extends ', 1)
+                in_class = parts[0].strip()
+                current_base = parts[1].strip() if len(parts) > 1 else None
+                current_fields = []
+            elif instr.op == 'CLASS_END':
+                if in_class:
+                    self.classes[in_class] = {'fields': list(current_fields), 'base': current_base}
+                in_class = None
+            elif instr.op == 'FIELD' and in_class:
+                current_fields.append((str(instr.arg1), str(instr.arg2)))
+            elif instr.op == 'FUNC_BEGIN':
+                fname = str(instr.arg1)
+                for cls in self.classes:
+                    if fname.startswith(cls + '_'):
+                        self.method_class_map[fname] = cls
+                        break
+            elif instr.op == 'NEW_OBJECT' and instr.result:
+                self.var_types[str(instr.result)] = str(instr.arg1)
+            elif instr.op == 'ASSIGN':
+                if instr.arg1 and str(instr.arg1) in self.var_types and instr.result:
+                    self.var_types[str(instr.result)] = self.var_types[str(instr.arg1)]
+
+    def _generate_struct_definitions(self):
+        """Emit C struct typedefs for each class."""
+        if not self.classes:
+            return
+        self.emit("// Class struct definitions")
+        for class_name, info in self.classes.items():
+            self.emit(f"typedef struct {class_name} {{")
+            self.indent_level += 1
+            for fname, ftype in info['fields']:
+                self.emit(f"{self._minipar_type_to_c(ftype)} {fname};")
+            self.indent_level -= 1
+            self.emit(f"}} {class_name};")
+        self.emit_blank()
+
+    def _minipar_type_to_c(self, t: str) -> str:
+        return {'number': 'int', 'string': 'char*', 'bool': 'int', 'void': 'void'}.get(t, 'int')
+
     def _infer_type(self, value) -> str:
         """Infer C type from a value"""
         if value is None:
@@ -257,19 +313,33 @@ class CCodeGenerator:
     
     def _generate_forward_declarations(self):
         """Generate forward declarations for functions"""
-        if self.function_params:
-            self.emit("// Forward declarations")
-            for func_name, params in self.function_params.items():
+        if not self.function_params:
+            return
+        self.emit("// Forward declarations")
+        for func_name, params in self.function_params.items():
+            class_name = self.method_class_map.get(func_name)
+            if class_name:
+                non_this = [p for p in params if p != 'this']
+                param_parts = [f"{class_name}* this"] + [f"int {p}" for p in non_this]
+                ret = f"{class_name}*" if func_name.endswith('_ctor') else "int"
+                self.emit(f"{ret} {func_name}({', '.join(param_parts)});")
+            else:
                 param_list = ", ".join([f"int {p}" for p in params])
                 self.emit(f"int {func_name}({param_list});")
-            self.emit_blank()
+        self.emit_blank()
     
     def _generate_global_variables(self):
         """Generate global variable declarations"""
         if self.global_vars:
             self.emit("// Global variables")
             for var_name, var_type in self.global_vars.items():
-                self.emit(f"{var_type} {var_name};  // Global variable")
+                if var_name in self.var_types:
+                    cls = self.var_types[var_name]
+                    self.emit(f"{cls}* {var_name} = NULL;")
+                elif var_type == 'char*':
+                    self.emit(f"{var_type} {var_name} = NULL;")
+                else:
+                    self.emit(f"{var_type} {var_name} = 0;")
             self.emit_blank()
     
     def _generate_functions(self, instructions: List[TAC]):
@@ -298,95 +368,108 @@ class CCodeGenerator:
                 self.function_code = []
                 self.label_map = {}
                 self.last_label = None
-                self.pending_params = []  # Reset pending params for new function
-                self.current_local_vars = {}  # Reset local vars for new function
-                
+                self.pending_params = []
+                self.current_local_vars = {}
+
                 # Collect FORMAL parameters (not call arguments)
                 params = []
                 j = i + 1
                 while j < len(instructions) and instructions[j].op == 'PARAM':
-                    if j not in call_params_indices:  # Only formal parameters
+                    if j not in call_params_indices:
                         params.append(instructions[j].arg1)
                     j += 1
-                
-                # Start function with proper signature
-                param_list = ", ".join([f"int {p}" for p in params])
-                self.emit(f"int {func_name}({param_list}) {{")
+
+                # Build function signature - OO methods get proper types
+                class_name = self.method_class_map.get(func_name)
+                if class_name:
+                    self.var_types['this'] = class_name
+                    non_this = [p for p in params if p != 'this']
+                    param_parts = [f"{class_name}* this"] + [f"int {p}" for p in non_this]
+                    ret = f"{class_name}*" if func_name.endswith('_ctor') else "int"
+                    self.emit(f"{ret} {func_name}({', '.join(param_parts)}) {{")
+                else:
+                    param_list = ", ".join([f"int {p}" for p in params])
+                    self.emit(f"int {func_name}({param_list}) {{")
                 self.indent_level += 1
-                
-                # Declare local temp variables
+
+                # Declare local temp variables with proper types
                 local_temps = set()
                 k = i
                 while k < len(instructions):
                     if instructions[k].op == 'FUNC_END':
                         break
-                    if instructions[k].result and instructions[k].result.startswith('t'):
-                        local_temps.add(instructions[k].result)
+                    if instructions[k].result and str(instructions[k].result).startswith('t'):
+                        local_temps.add(str(instructions[k].result))
                     k += 1
-                
+
                 if local_temps:
                     self.emit("// Temporary variables")
                     for temp in sorted(local_temps):
-                        self.emit(f"int {temp} = 0;")
-                
-                # Declare local variables (excluding parameters)
-                local_vars = {}  # var_name -> type
+                        if temp in self.var_types:
+                            cls = self.var_types[temp]
+                            self.emit(f"{cls}* {temp} = NULL;")
+                        else:
+                            self.emit(f"int {temp} = 0;")
+
+                # Declare local non-parameter variables
+                local_vars: Dict[str, str] = {}
                 k = i
                 while k < len(instructions):
                     if instructions[k].op == 'FUNC_END':
                         break
                     if instructions[k].op == 'ASSIGN':
                         var = instructions[k].result
-                        if var and not var.startswith('t') and var not in self.global_vars and var not in params:
-                            # Only infer type on first assignment (don't overwrite)
+                        if var and not str(var).startswith('t') and var not in self.global_vars and var not in params:
                             if var not in local_vars:
-                                # Infer type from assigned value
-                                var_type = self._infer_type(instructions[k].arg1)
-                                local_vars[var] = var_type
+                                if var in self.var_types:
+                                    local_vars[var] = f"class:{self.var_types[var]}"
+                                else:
+                                    local_vars[var] = self._infer_type(instructions[k].arg1)
                     k += 1
-                
-                # Store local vars for use during instruction generation
+
                 self.current_local_vars = local_vars.copy()
-                
+
                 if local_vars:
                     self.emit("// Local variables")
                     for var, var_type in sorted(local_vars.items()):
-                        if var_type == 'char*':
+                        if var_type.startswith('class:'):
+                            cls = var_type[6:]
+                            self.emit(f"{cls}* {var} = NULL;")
+                        elif var_type == 'char*':
                             self.emit(f"{var_type} {var} = NULL;")
                         else:
                             self.emit(f"{var_type} {var} = 0;")
-                
+
                 if local_temps or local_vars:
                     self.emit_blank()
-                
-                # Generate function body - start from first non-formal-PARAM instruction
-                # Skip only the formal parameter PARAM instructions
+
+                # Generate function body (skip formal PARAM instructions)
                 j = i + 1
                 while j < len(instructions) and instructions[j].op == 'PARAM' and j not in call_params_indices:
                     j += 1
-                
-                # Now generate the body
+
                 while j < len(instructions):
                     instr = instructions[j]
                     if instr.op == 'FUNC_END':
-                        # Check if last instruction was a label
                         if self.last_label:
                             self.emit(";  // Empty statement after label")
-                        i = j  # Update i to FUNC_END position
+                        i = j
                         break
                     self._generate_instruction(instr)
                     j += 1
-                
+
                 # End function
                 self.indent_level -= 1
                 self.emit("}")
                 self.emit_blank()
-                
+
                 # Save function code
                 self.functions[func_name] = self.function_code[:]
                 self.c_code.extend(self.function_code)
                 self.current_function = None
                 self.function_code = []
+                if 'this' in self.var_types:
+                    del self.var_types['this']
             
             i += 1
     
@@ -415,7 +498,11 @@ class CCodeGenerator:
         if global_temps:
             self.emit("// Temporary variables")
             for temp in sorted(global_temps):
-                self.emit(f"int {temp} = 0;")
+                if temp in self.var_types:
+                    cls = self.var_types[temp]
+                    self.emit(f"{cls}* {temp} = NULL;")
+                else:
+                    self.emit(f"int {temp} = 0;")
             self.emit_blank()
         
         # Generate global scope instructions (outside functions)
@@ -442,8 +529,8 @@ class CCodeGenerator:
         """Generate C code for a single TAC instruction"""
         op = instr.op
         
-        # Skip function boundary markers in body generation
-        if op in ['FUNC_BEGIN', 'FUNC_END']:
+        # Skip function boundary markers and class metadata
+        if op in ['FUNC_BEGIN', 'FUNC_END', 'CLASS_BEGIN', 'CLASS_END', 'FIELD', 'METHOD_ARGS']:
             return
         
         # Handle PARAM instructions - collect them for the next CALL
@@ -649,14 +736,49 @@ class CCodeGenerator:
             self.emit(f"// Channel {instr.arg2} created ({instr.arg1})")
             return
         
-        if op == 'METHOD_CALL':
-            self.emit(f"// Method call: {instr.arg1}.{instr.arg2}()")
-            if instr.result:
-                self.emit(f"{instr.result} = 0;  // Method result")
+        # OO operations
+        if op == 'NEW_OBJECT':
+            cls = str(instr.arg1)
+            n_args = int(instr.arg2) if instr.arg2 else 0
+            result = instr.result
+            ctor_args = self.pending_params[-n_args:] if n_args > 0 else []
+            self.pending_params = self.pending_params[:-n_args] if n_args > 0 else self.pending_params
+            all_args = [self._format_value(result)] + [self._format_value(a) for a in ctor_args]
+            self.emit(f"{result} = ({cls}*)malloc(sizeof({cls}));")
+            self.emit(f"{cls}_ctor({', '.join(all_args)});")
             return
-        
-        if op == 'METHOD_ARGS':
-            return  # Skip - already handled in METHOD_CALL
+
+        if op == 'MEMBER_ACCESS':
+            obj = instr.arg1
+            field = instr.arg2
+            result = instr.result
+            self.emit(f"{result} = {self._format_value(obj)}->{field};")
+            return
+
+        if op == 'MEMBER_STORE':
+            obj = instr.arg1
+            field = instr.arg2
+            value = instr.result
+            self.emit(f"{self._format_value(obj)}->{field} = {self._format_value(value)};")
+            return
+
+        if op == 'METHOD_CALL':
+            receiver = str(instr.arg1)
+            method = str(instr.arg2)
+            result = instr.result
+            cls = self.var_types.get(receiver)
+            method_args = [self._format_value(p) for p in self.pending_params]
+            self.pending_params = []
+            if cls:
+                func_name = f"{cls}_{method}"
+                all_args = [self._format_value(receiver)] + method_args
+                if result:
+                    self.emit(f"{result} = {func_name}({', '.join(all_args)});")
+                else:
+                    self.emit(f"{func_name}({', '.join(all_args)});")
+            else:
+                self.emit(f"// METHOD_CALL unresolved: {receiver}.{method}")
+            return
         
         # Default: comment out unknown instructions
         self.emit(f"// TAC: {instr}")

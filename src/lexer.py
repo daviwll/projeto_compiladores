@@ -13,6 +13,7 @@ class TokenType(Enum):
     # Keywords
     BREAK = auto()
     C_CHANNEL = auto()
+    CLASS = auto()
     CONTINUE = auto()
     ELSE = auto()
     FALSE = auto()
@@ -20,13 +21,18 @@ class TokenType(Enum):
     FUNC = auto()
     IF = auto()
     IN = auto()
+    NEW = auto()
     PAR = auto()
     RETURN = auto()
     S_CHANNEL = auto()
     SEQ = auto()  # NEW: Sequential block keyword
+    SUPER = auto()
+    THIS = auto()
     TRUE = auto()
     VAR = auto()
     WHILE = auto()
+    EXTENDS = auto()
+    CONSTRUCTOR = auto()
     
     # Types
     NUMBER = auto()
@@ -98,6 +104,7 @@ class Lexer:
     KEYWORDS = {
         'break': TokenType.BREAK,
         'c_channel': TokenType.C_CHANNEL,
+        'class': TokenType.CLASS,
         'continue': TokenType.CONTINUE,
         'else': TokenType.ELSE,
         'false': TokenType.FALSE,
@@ -105,13 +112,18 @@ class Lexer:
         'func': TokenType.FUNC,
         'if': TokenType.IF,
         'in': TokenType.IN,
+        'new': TokenType.NEW,
         'par': TokenType.PAR,
         'return': TokenType.RETURN,
         's_channel': TokenType.S_CHANNEL,
         'seq': TokenType.SEQ,  # NEW: SEQ keyword
+        'super': TokenType.SUPER,
+        'this': TokenType.THIS,
         'true': TokenType.TRUE,
         'var': TokenType.VAR,
         'while': TokenType.WHILE,
+        'extends': TokenType.EXTENDS,
+        'constructor': TokenType.CONSTRUCTOR,
         'number': TokenType.NUMBER,
         'string': TokenType.STRING,
         'bool': TokenType.BOOL,

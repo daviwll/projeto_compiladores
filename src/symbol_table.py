@@ -14,6 +14,11 @@ class SymbolType(Enum):
     FUNCTION = "function"
     PARAMETER = "parameter"
     CHANNEL = "channel"
+    CLASS = "class"
+    FIELD = "field"
+    METHOD = "method"
+    CONSTRUCTOR = "constructor"
+    INSTANCE = "instance"
 
 
 @dataclass
@@ -25,6 +30,7 @@ class Symbol:
     scope_level: int
     line_declared: int
     is_initialized: bool = True
+    base_class: Optional[str] = None
     # For functions: parameter types and return type
     param_types: Optional[List[str]] = None
     return_type: Optional[str] = None

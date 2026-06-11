@@ -119,7 +119,51 @@ print("res =", res)
 /* PARTE 2 */
 var entrada: string = input("Digite algo: ")
 print(entrada)
-""" 
+""",
+
+    "OO: Counter Class": """# Object-Oriented Example: Counter Class
+class Counter {
+    var value: number = 0
+    func inc() -> number {
+        value = value + 1
+        return value
+    }
+    func get() -> number {
+        return value
+    }
+    func reset() -> void {
+        value = 0
+    }
+}
+
+var c: Counter = new Counter()
+c.inc()
+c.inc()
+c.inc()
+c.get()
+""",
+
+    "OO: Inheritance": """# Object-Oriented Example: Inheritance
+class Animal {
+    var name: string = "unknown"
+    func speak() -> string {
+        return "..."
+    }
+    func getName() -> string {
+        return name
+    }
+}
+
+class Dog extends Animal {
+    func fetch() -> string {
+        return "fetching!"
+    }
+}
+
+var d: Dog = new Dog()
+d.speak()
+d.fetch()
+"""
 }
 
 

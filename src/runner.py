@@ -636,11 +636,17 @@ class MiniparRunner:
     
     def exec_MethodCall(self, node: MethodCall) -> Any:
         """Execute method call (e.g., channel.send(), list.append(), str.split())"""
-        obj_name = node.object
+        obj_ref = node.object
+        if isinstance(obj_ref, Variable):
+            obj_name = obj_ref.name
+        elif isinstance(obj_ref, str):
+            obj_name = obj_ref
+        else:
+            obj_name = None
         method_name = node.method
 
         # Check if it's a channel method
-        if obj_name in self.channels:
+        if obj_name and obj_name in self.channels:
             conn = self.channels[obj_name]
 
             if method_name == 'send':
@@ -672,7 +678,10 @@ class MiniparRunner:
                 raise ValueError(f"Unknown channel method: {method_name}")
 
         # Get the object
-        obj = self.current_scope.get(obj_name)
+        if obj_name is not None:
+            obj = self.current_scope.get(obj_name)
+        else:
+            obj = self.execute(obj_ref)
         if obj is None:
             raise NameError(f"Object '{obj_name}' not found")
 
