@@ -322,9 +322,9 @@ def execute_program(source_code, user_input):
 
 try:
     import logging
-    from flask import Flask, Response, jsonify, request, send_from_directory
+    from flask import Flask, Response, jsonify, request
 
-    flask_app = Flask(__name__, static_folder="static", static_url_path="/static")
+    flask_app = Flask(__name__)
     flask_app.logger.setLevel(logging.INFO)
 
     @flask_app.route("/health")
@@ -384,18 +384,12 @@ try:
         code = result["c_code"] if target == "c" else result["assembly"]
         return Response(code, status=200, mimetype="text/plain")
 
-    @flask_app.route("/")
-    def index():
-        static_dir = os.path.join(os.path.dirname(__file__), "static")
-        return send_from_directory(static_dir, "index.html")
-
     def launch_flask(host="127.0.0.1", port=8000, debug=False):
-        """Start the Flask HTTP API + web UI."""
+        """Start the Flask HTTP API."""
         print(f"MiniPar HTTP API running at http://{host}:{port}")
         print("  GET  /health      — readiness check")
         print("  POST /compile     — compile source, returns JSON")
         print("  POST /generate    — generate C or ARM code, returns text")
-        print("  GET  /            — minimal web UI")
         flask_app.run(host=host, port=port, debug=debug)
 
 except ImportError:

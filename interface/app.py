@@ -137,10 +137,13 @@ class Counter {
 }
 
 var c: Counter = new Counter()
+print("Initial value:", c.get())
 c.inc()
 c.inc()
 c.inc()
-c.get()
+print("After 3 increments:", c.get())
+c.reset()
+print("After reset:", c.get())
 """,
 
     "OO: Inheritance": """# Object-Oriented Example: Inheritance
@@ -161,8 +164,9 @@ class Dog extends Animal {
 }
 
 var d: Dog = new Dog()
-d.speak()
-d.fetch()
+print("Animal speaks:", d.speak())
+print("Dog fetches:", d.fetch())
+print("Name:", d.getName())
 """
 }
 
@@ -416,25 +420,59 @@ with gr.Blocks(title="Minipar Compiler") as app:
                 }
                 ```
                 
+                ### Classes and Objects
+                ```minipar
+                class ClassName {
+                    var field: type = default_value
+                    func method() -> return_type {
+                        return field
+                    }
+                }
+
+                var obj: ClassName = new ClassName()
+                print("value:", obj.method())
+                obj.field = 42
+                ```
+
+                ### Inheritance
+                ```minipar
+                class Animal {
+                    var name: string = "unknown"
+                    func speak() -> string {
+                        return "..."
+                    }
+                }
+
+                class Dog extends Animal {
+                    func fetch() -> string {
+                        return "fetching!"
+                    }
+                }
+
+                var d: Dog = new Dog()
+                print("speaks:", d.speak())   # inherited method
+                print("fetches:", d.fetch())  # own method
+                ```
+
                 ### Operators
                 - **Arithmetic**: `+` `-` `*` `/` `%`
                 - **Comparison**: `==` `!=` `<` `>` `<=` `>=`
                 - **Logical**: `&&` `||` `!`
-                
+
                 ### Built-in Functions
                 - `print(...)` - Output to console
                 - `input(prompt)` - Read user input
-                
+
                 ## 💡 Tips
-                
+
                 1. Start with example programs to learn syntax
                 2. Use "Show TAC" to understand intermediate code
                 3. Use "Show C Code" to see how code is translated
                 4. Check compilation log for errors
                 5. Test programs in Execute tab before downloading
-                
+
                 ## 📝 Example Programs
-                
+
                 Select from the dropdown to load:
                 - **Hello World** - Basic printing
                 - **Variables and Arithmetic** - Basic operations
@@ -442,6 +480,8 @@ with gr.Blocks(title="Minipar Compiler") as app:
                 - **Loops** - While loops and control flow
                 - **Conditionals** - If-else statements
                 - **Factorial** - Recursive functions
+                - **OO: Counter Class** - Classes, fields, methods, reset
+                - **OO: Inheritance** - Extends, inherited methods
                 
                 ## 🐛 Troubleshooting
                 
