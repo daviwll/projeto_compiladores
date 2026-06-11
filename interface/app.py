@@ -204,7 +204,7 @@ custom_css = """
 
 
 # Create the Gradio interface
-with gr.Blocks(css=custom_css, title="Minipar Compiler") as app:
+with gr.Blocks(title="Minipar Compiler") as app:
     
     # Header
     gr.Markdown(
@@ -239,7 +239,6 @@ with gr.Blocks(css=custom_css, title="Minipar Compiler") as app:
                         value="# Write your Minipar code here\nprint(\"Hello, World!\")",
                         placeholder="Enter your Minipar code here...",
                         elem_classes=["code-editor"],
-                        show_copy_button=True
                     )
                     
                     gr.Markdown("### ⚙️ Compilation Options")
@@ -266,7 +265,6 @@ with gr.Blocks(css=custom_css, title="Minipar Compiler") as app:
                         lines=25,
                         max_lines=30,
                         elem_classes=["output-box"],
-                        show_copy_button=True
                     )
                     
                     compilation_log = gr.Textbox(
@@ -323,7 +321,6 @@ with gr.Blocks(css=custom_css, title="Minipar Compiler") as app:
                         value="# Write your Minipar code here\nprint(\"Hello, World!\")",
                         placeholder="Enter your Minipar code here...",
                         elem_classes=["code-editor"],
-                        show_copy_button=True
                     )
                     
                     gr.Markdown("### 📥 Program Input")
@@ -343,7 +340,6 @@ with gr.Blocks(css=custom_css, title="Minipar Compiler") as app:
                         lines=23,
                         max_lines=30,
                         elem_classes=["output-box"],
-                        show_copy_button=True
                     )
             
             # Connect example selector for executor
@@ -468,7 +464,7 @@ with gr.Blocks(css=custom_css, title="Minipar Compiler") as app:
         ---
         <div style="text-align: center; color: #666;">
             <p>Minipar Compiler v1.0 | Built with Gradio | 
-            <a href="https://github.com/your-repo" target="_blank">Documentation</a></p>
+            <a href="https://github.com/daviwll/projeto_compiladores" target="_blank">Documentation</a></p>
         </div>
         """
     )
@@ -480,7 +476,8 @@ def launch():
         server_name="0.0.0.0",
         server_port=7860,
         share=False,
-        show_error=True
+        show_error=True,
+        css=custom_css,
     )
 
 

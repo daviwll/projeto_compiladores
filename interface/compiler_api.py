@@ -307,8 +307,103 @@ def execute_program(source_code, user_input):
     Execute program and return output
     """
     result = api.execute_code(source_code, user_input)
-    
+
     if not result['success']:
         return f"❌ Execution Error:\n{result['error']}"
-    
+
     return result['output']
+
+
+# ---------------------------------------------------------------------------
+# Flask HTTP API
+# Endpoints: GET /health, POST /compile, POST /generate, GET /
+# Run standalone:  python interface/compiler_api.py
+# ---------------------------------------------------------------------------
+
+try:
+    import logging
+    from flask import Flask, Response, jsonify, request, send_from_directory
+
+    flask_app = Flask(__name__, static_folder="static", static_url_path="/static")
+    flask_app.logger.setLevel(logging.INFO)
+
+    @flask_app.route("/health")
+    def health():
+        return jsonify({"ok": True})
+
+    @flask_app.route("/compile", methods=["POST"])
+    def compile_route():
+        data = request.get_json(silent=True) or {}
+        source = data.get("source", "")
+        if not source.strip():
+            return jsonify({"ok": False, "errors": ["No source code provided"]}), 400
+
+        result = api.compile_code(
+            source,
+            show_tokens=bool(data.get("show_tokens", False)),
+            show_ast=bool(data.get("show_ast", False)),
+            show_semantic=bool(data.get("show_semantic", False)),
+            show_tac=bool(data.get("show_tac", True)),
+            generate_c=bool(data.get("generate_c", False)),
+            generate_asm=bool(data.get("generate_asm", False)),
+        )
+
+        errors = [result["error"]] if result["error"] else []
+        return jsonify({
+            "ok": result["success"],
+            "errors": errors,
+            "tac": result["tac"],
+            "ast": result["ast"],
+            "tokens": result["tokens"],
+            "c_code": result["c_code"],
+            "assembly": result["assembly"],
+            "output": result["output"],
+        })
+
+    @flask_app.route("/generate", methods=["POST"])
+    def generate_route():
+        data = request.get_json(silent=True) or {}
+        source = data.get("source", "")
+        target = data.get("target", "c")  # "c" or "arm"
+
+        if not source.strip():
+            return jsonify({"ok": False, "error": "No source code provided"}), 400
+        if target not in ("c", "arm"):
+            return jsonify({"ok": False, "error": "target must be 'c' or 'arm'"}), 400
+
+        result = api.compile_code(
+            source,
+            show_tac=False,
+            generate_c=(target == "c"),
+            generate_asm=(target == "arm"),
+        )
+
+        if not result["success"]:
+            return jsonify({"ok": False, "error": result["error"]}), 422
+
+        code = result["c_code"] if target == "c" else result["assembly"]
+        return Response(code, status=200, mimetype="text/plain")
+
+    @flask_app.route("/")
+    def index():
+        static_dir = os.path.join(os.path.dirname(__file__), "static")
+        return send_from_directory(static_dir, "index.html")
+
+    def launch_flask(host="127.0.0.1", port=8000, debug=False):
+        """Start the Flask HTTP API + web UI."""
+        print(f"MiniPar HTTP API running at http://{host}:{port}")
+        print("  GET  /health      — readiness check")
+        print("  POST /compile     — compile source, returns JSON")
+        print("  POST /generate    — generate C or ARM code, returns text")
+        print("  GET  /            — minimal web UI")
+        flask_app.run(host=host, port=port, debug=debug)
+
+except ImportError:
+    flask_app = None  # type: ignore
+
+    def launch_flask(*args, **kwargs):
+        raise RuntimeError("Flask is not installed. Run: pip install flask")
+
+
+if __name__ == "__main__":
+    launch_flask(debug=True)

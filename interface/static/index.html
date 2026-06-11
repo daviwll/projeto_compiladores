@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MiniPar Compiler</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #1e1e2e; color: #cdd6f4;
+    }
+    header {
+      background: #313244; padding: 1rem 1.5rem;
+      border-bottom: 2px solid #89b4fa;
+    }
+    header h1 { margin: 0; font-size: 1.4rem; color: #89b4fa; }
+    header p  { margin: .2rem 0 0; font-size: .85rem; color: #a6adc8; }
+
+    main {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      padding: 1rem 1.5rem;
+      height: calc(100vh - 80px);
+    }
+    @media (max-width: 700px) { main { grid-template-columns: 1fr; } }
+
+    .panel { display: flex; flex-direction: column; gap: .6rem; }
+    label { font-size: .8rem; color: #a6adc8; }
+
+    textarea, pre {
+      flex: 1;
+      background: #181825; color: #cdd6f4;
+      border: 1px solid #45475a; border-radius: 6px;
+      padding: .75rem; font-family: 'Cascadia Code', 'Consolas', monospace;
+      font-size: .85rem; resize: none;
+    }
+    textarea { outline: none; }
+    textarea:focus { border-color: #89b4fa; }
+    pre { overflow: auto; white-space: pre-wrap; word-break: break-all; margin: 0; }
+
+    .options {
+      display: flex; flex-wrap: wrap; gap: .5rem; align-items: center;
+    }
+    .options label {
+      display: flex; align-items: center; gap: .3rem;
+      cursor: pointer; color: #cdd6f4; font-size: .82rem;
+    }
+    .options input[type=checkbox] { accent-color: #89b4fa; }
+
+    .actions { display: flex; gap: .6rem; flex-wrap: wrap; }
+
+    button {
+      padding: .45rem .9rem; border: none; border-radius: 6px;
+      cursor: pointer; font-size: .85rem; font-weight: 600;
+      transition: opacity .15s;
+    }
+    button:hover { opacity: .85; }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary  { background: #89b4fa; color: #1e1e2e; }
+    .btn-secondary{ background: #a6e3a1; color: #1e1e2e; }
+    .btn-tertiary { background: #f38ba8; color: #1e1e2e; }
+    .btn-sm       { background: #45475a; color: #cdd6f4; font-size: .78rem; padding: .3rem .7rem; }
+
+    #status {
+      font-size: .8rem; padding: .3rem .6rem; border-radius: 4px;
+      display: inline-block;
+    }
+    .ok    { background: #a6e3a1; color: #1e1e2e; }
+    .error { background: #f38ba8; color: #1e1e2e; }
+    .info  { background: #89b4fa; color: #1e1e2e; }
+
+    .result-tabs {
+      display: flex; gap: .4rem; flex-wrap: wrap;
+    }
+    .tab-btn {
+      background: #313244; color: #a6adc8; border: 1px solid #45475a;
+      border-radius: 4px; padding: .25rem .6rem; font-size: .78rem;
+      cursor: pointer;
+    }
+    .tab-btn.active { background: #89b4fa; color: #1e1e2e; border-color: #89b4fa; }
+
+    .examples-select {
+      background: #313244; color: #cdd6f4; border: 1px solid #45475a;
+      border-radius: 6px; padding: .3rem .5rem; font-size: .82rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>MiniPar Compiler</h1>
+  <p>Compile MiniPar programs — powered by the local HTTP API</p>
+</header>
+
+<main>
+  <!-- LEFT: editor -->
+  <div class="panel">
+    <div style="display:flex; gap:.6rem; align-items:center; flex-wrap:wrap;">
+      <label>Source code</label>
+      <select class="examples-select" id="examples" onchange="loadExample(this.value)">
+        <option value="">Load example…</option>
+        <option value="hello">Hello World</option>
+        <option value="factorial">Factorial (recursive)</option>
+        <option value="counter">OO: Counter class</option>
+        <option value="inheritance">OO: Inheritance</option>
+      </select>
+    </div>
+
+    <textarea id="source" spellcheck="false" placeholder="# Write your MiniPar code here
+print(&quot;Hello, World!&quot;)">
+func fatorial(n: number) -> number {
+    if (n == 0 || n == 1) { return 1 }
+    else { return n * fatorial(n - 1) }
+}
+
+print("Factorial of 5:", fatorial(5))
+print("Factorial of 10:", fatorial(10))
+</textarea>
+
+    <div class="options">
+      <label><input type="checkbox" id="opt_tokens" /> Tokens</label>
+      <label><input type="checkbox" id="opt_ast" /> AST</label>
+      <label><input type="checkbox" id="opt_semantic" /> Semantic</label>
+      <label><input type="checkbox" id="opt_tac" checked /> TAC</label>
+      <label><input type="checkbox" id="opt_c" /> C code</label>
+      <label><input type="checkbox" id="opt_arm" /> ARM asm</label>
+    </div>
+
+    <div class="actions">
+      <button class="btn-primary" onclick="doCompile()">Compile</button>
+      <button class="btn-secondary" onclick="doGenerate('c')">Generate C</button>
+      <button class="btn-tertiary" onclick="doGenerate('arm')">Generate ARM</button>
+      <span id="status"></span>
+    </div>
+  </div>
+
+  <!-- RIGHT: output -->
+  <div class="panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.4rem;">
+      <label>Output</label>
+      <div class="result-tabs" id="tabs"></div>
+      <button class="btn-sm" onclick="clearOutput()">Clear</button>
+    </div>
+    <pre id="output">Compile a program to see output here.</pre>
+  </div>
+</main>
+
+<script>
+const API = '';  // same origin
+
+const EXAMPLES = {
+  hello: `print("Hello, World!")\nprint("Welcome to MiniPar!")`,
+  factorial: `func fatorial(n: number) -> number {
+    if (n == 0 || n == 1) { return 1 }
+    else { return n * fatorial(n - 1) }
+}
+print("5! =", fatorial(5))
+print("10! =", fatorial(10))`,
+  counter: `class Counter {
+    var value: number = 0
+    func inc() -> number {
+        value = value + 1
+        return value
+    }
+    func get() -> number { return value }
+    func reset() -> void { value = 0 }
+}
+var c: Counter = new Counter()
+c.inc()
+c.inc()
+c.inc()
+c.get()`,
+  inheritance: `class Animal {
+    var name: string = "unknown"
+    func speak() -> string { return "..." }
+    func getName() -> string { return name }
+}
+class Dog extends Animal {
+    func fetch() -> string { return "fetching!" }
+}
+var d: Dog = new Dog()
+d.speak()
+d.fetch()`
+};
+
+let _tabs = {};
+let _activeTab = null;
+
+function loadExample(key) {
+  if (EXAMPLES[key]) document.getElementById('source').value = EXAMPLES[key];
+}
+
+function setStatus(msg, cls) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = cls;
+}
+
+function setOutput(label, content) {
+  _tabs[label] = content;
+  renderTabs();
+  showTab(label);
+}
+
+function renderTabs() {
+  const container = document.getElementById('tabs');
+  container.innerHTML = '';
+  for (const key of Object.keys(_tabs)) {
+    const b = document.createElement('button');
+    b.className = 'tab-btn' + (key === _activeTab ? ' active' : '');
+    b.textContent = key;
+    b.onclick = () => showTab(key);
+    container.appendChild(b);
+  }
+}
+
+function showTab(key) {
+  _activeTab = key;
+  document.getElementById('output').textContent = _tabs[key] || '';
+  renderTabs();
+}
+
+function clearOutput() {
+  _tabs = {};
+  _activeTab = null;
+  document.getElementById('tabs').innerHTML = '';
+  document.getElementById('output').textContent = '';
+  setStatus('', '');
+}
+
+async function doCompile() {
+  const source = document.getElementById('source').value;
+  setStatus('Compiling…', 'info');
+
+  const opts = {
+    source,
+    show_tokens:   document.getElementById('opt_tokens').checked,
+    show_ast:      document.getElementById('opt_ast').checked,
+    show_semantic: document.getElementById('opt_semantic').checked,
+    show_tac:      document.getElementById('opt_tac').checked,
+    generate_c:    document.getElementById('opt_c').checked,
+    generate_asm:  document.getElementById('opt_arm').checked,
+  };
+
+  try {
+    const res = await fetch(API + '/compile', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(opts),
+    });
+    const data = await res.json();
+
+    if (!data.ok) {
+      setStatus('Error', 'error');
+      setOutput('Error', (data.errors || []).join('\n') + '\n\n' + (data.output || ''));
+      return;
+    }
+
+    setStatus('OK', 'ok');
+    if (data.tac)      setOutput('TAC',      data.tac);
+    if (data.ast)      setOutput('AST',      data.ast);
+    if (data.tokens)   setOutput('Tokens',   data.tokens);
+    if (data.c_code)   setOutput('C code',   data.c_code);
+    if (data.assembly) setOutput('ARM',      data.assembly);
+    if (!data.tac && !data.ast && !data.tokens)
+      setOutput('Log', data.output || 'Compilation succeeded.');
+
+  } catch (err) {
+    setStatus('Network error', 'error');
+    setOutput('Error', String(err));
+  }
+}
+
+async function doGenerate(target) {
+  const source = document.getElementById('source').value;
+  setStatus('Generating…', 'info');
+
+  try {
+    const res = await fetch(API + '/generate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ source, target }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setStatus('Error', 'error');
+      setOutput('Error', data.error || `HTTP ${res.status}`);
+      return;
+    }
+
+    const code = await res.text();
+    setStatus('OK', 'ok');
+    setOutput(target === 'c' ? 'C code' : 'ARM', code);
+
+  } catch (err) {
+    setStatus('Network error', 'error');
+    setOutput('Error', String(err));
+  }
+}
+
+// Keyboard shortcut: Ctrl+Enter to compile
+document.getElementById('source').addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    doCompile();
+  }
+});
+</script>
+</body>
+</html>

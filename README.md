@@ -18,9 +18,10 @@ Um compilador completo para a linguagem **Minipar 2026.1** com suporte a **orien
 
 ```
 projeto_compiladores/
-├── interface/               # Web Interface ⭐ NEW
-│   ├── app.py                # Gradio frontend
-│   ├── compiler_api.py       # Backend API
+├── interface/               # Web Interface
+│   ├── app.py                # Gradio frontend (full-featured)
+│   ├── compiler_api.py       # Flask HTTP API + Gradio backend
+│   ├── static/index.html     # Minimal plain-HTML web UI
 │   ├── start.bat             # Windows launcher
 │   ├── start.sh              # Linux/Mac launcher
 │   ├── test_setup.py         # Setup verification
@@ -30,6 +31,7 @@ projeto_compiladores/
 │   └── QUICKSTART.md         # Quick start
 │
 ├── src/                      # Código fonte do compilador
+│   ├── minipar_cli.py       # CLI com subcomandos (compile, ast, tac, …)
 │   ├── __init__.py          # Inicialização do pacote
 │   ├── lexer.py             # Análise Léxica
 │   ├── parser.py            # Análise Sintática
@@ -103,54 +105,82 @@ projeto_compiladores/
 
 ## 🌐 Quick Start
 
-### 🚀 Option 1: Web Interface (Easiest!) ⭐ NEW
+### Setup (one-time)
 
 ```bash
-# Start web interface
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install flask pytest
+```
+
+---
+
+### Option 1: CLI (recommended)
+
+```bash
+# Compile a file (prints TAC)
+python src/minipar_cli.py compile examples/ex1.minipar
+
+# Show AST
+python src/minipar_cli.py ast examples/fatorial_rec.minipar
+
+# Generate C code
+python src/minipar_cli.py generate-c examples/ex5.minipar --out /tmp/ex5.c
+
+# Generate ARM assembly
+python src/minipar_cli.py generate-arm examples/ex5.minipar
+
+# Run all tests
+python src/minipar_cli.py test
+```
+
+See `docs/INTEGRATION.md` for the full command reference.
+
+---
+
+### Option 2: HTTP API + minimal Web UI
+
+```bash
+python interface/compiler_api.py
+# → http://127.0.0.1:8000   (web UI)
+# → http://127.0.0.1:8000/health
+# → POST http://127.0.0.1:8000/compile
+# → POST http://127.0.0.1:8000/generate
+```
+
+Example with curl:
+
+```bash
+curl -s http://127.0.0.1:8000/compile \
+  -H 'Content-Type: application/json' \
+  -d '{"source": "print(\"Hello!\")", "show_tac": true}' | python -m json.tool
+```
+
+---
+
+### Option 3: Gradio Web Interface (full-featured)
+
+```bash
 cd interface
 python app.py
-
-# Or use launcher
-# Windows: start.bat
-# Linux/Mac: ./start.sh
+# → http://localhost:7860
 ```
 
-**Browser opens to:** http://localhost:7860
+Includes interactive code editor, execution tab, and example programs.
 
-**Features:**
-- ✅ Interactive code editor
-- ✅ Multiple compilation views
-- ✅ Direct program execution
-- ✅ One-click .exe download
-- ✅ Built-in examples and help
+---
 
-### 📝 Option 2: Command Line (Traditional)
+### Run tests
 
-### 1. Executar Programa Diretamente (Runtime)
 ```bash
-# Teste básico
-py src\runner.py test_runner_simple.minipar
+# All tests
+.venv/bin/python -m pytest -q
 
-# Servidor (Terminal 1)
-py src\runner.py calc_server.minipar
+# Unit tests only
+.venv/bin/python -m pytest tests/test_compilerok.py -q
 
-# Cliente (Terminal 2)
-py src\runner.py calc_client.minipar
-```
-
-### 2. Compilar para TAC
-```bash
-py compile.py examples\ex1.minipar
-```
-
-### 3. Compilar para Executável
-```bash
-py compile.py examples\ex1.minipar --exe
-```
-
-### 4. Executar Testes
-```bash
-py run_tests.py
+# API integration tests
+.venv/bin/python -m pytest tests/test_integration_api.py -q
 ```
 
 ## 🔧 Componentes Principais
