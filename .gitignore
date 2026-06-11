@@ -11,6 +11,7 @@ ENV/
 # Generated files
 generated/
 output.*
+output
 *.exe
 *.o
 *.out
