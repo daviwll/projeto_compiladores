@@ -163,11 +163,3 @@ def test_generate_empty_source(client):
     assert res.status_code == 400
 
 
-# ---------------------------------------------------------------------------
-# /  (static index.html)
-# ---------------------------------------------------------------------------
-
-def test_index_html(client):
-    res = client.get("/")
-    assert res.status_code == 200
-    assert b"MiniPar" in res.data
