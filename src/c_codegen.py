@@ -35,6 +35,9 @@ class CCodeGenerator:
         self.classes: Dict[str, dict] = {}           # class_name -> {fields: [(name,type)], base: str}
         self.var_types: Dict[str, str] = {}          # var_name -> class_name
         self.method_class_map: Dict[str, str] = {}   # func_name -> class_name
+        self.method_return_types: Dict[str, str] = {}  # func_name -> C return type
+        self.pending_method_call = None  # deferred (receiver, method, result) until METHOD_ARGS
+        self._active_temp_types: Dict[str, str] = {}  # temp -> C type, built live during generation
     
     def indent(self) -> str:
         """Get current indentation"""
@@ -68,9 +71,11 @@ class CCodeGenerator:
         self.classes = {}
         self.var_types = {}
         self.method_class_map = {}
+        self.method_return_types = {}
 
         # First pass: collect information about functions, variables, and OO structure
         self._analyze_oo_tac(tac_instructions)
+        self._determine_method_return_types(tac_instructions)
         self._analyze_tac(tac_instructions)
 
         # Generate C code
@@ -206,16 +211,152 @@ class CCodeGenerator:
                 if instr.arg1 and str(instr.arg1) in self.var_types and instr.result:
                     self.var_types[str(instr.result)] = self.var_types[str(instr.arg1)]
 
+    # ------------------------------------------------------------------
+    # OO helper methods
+    # ------------------------------------------------------------------
+
+    def _get_field_type(self, class_name: str, field_name: str) -> str:
+        """Return the C type of a field, walking up the inheritance chain."""
+        cls = class_name
+        while cls:
+            info = self.classes.get(cls)
+            if not info:
+                break
+            for fname, ftype in info['fields']:
+                if fname == field_name:
+                    return self._minipar_type_to_c(ftype)
+            cls = info.get('base')
+        return 'int'
+
+    def _resolve_method_class(self, receiver_class: str, method_name: str) -> str:
+        """Walk the inheritance chain to find which class defines a method."""
+        cls = receiver_class
+        while cls:
+            if f"{cls}_{method_name}" in self.function_params:
+                return cls
+            info = self.classes.get(cls)
+            if not info:
+                break
+            cls = info.get('base')
+        return receiver_class
+
+    def _get_function_temp_types(self, func_name: str, instructions) -> Dict[str, str]:
+        """Return temp-var → C-type map for a method body (string fields → char*)."""
+        temp_types: Dict[str, str] = {}
+        cls = self.method_class_map.get(func_name)
+        in_func = False
+        for instr in instructions:
+            if instr.op == 'FUNC_BEGIN' and str(instr.arg1) == func_name:
+                in_func = True
+                continue
+            if not in_func:
+                continue
+            if instr.op == 'FUNC_END':
+                break
+            if not (instr.result and str(instr.result).startswith('t')):
+                continue
+            t = str(instr.result)
+            if instr.op == 'MEMBER_ACCESS' and cls:
+                ft = self._get_field_type(cls, str(instr.arg2))
+                if ft == 'char*':
+                    temp_types[t] = 'char*'
+            elif instr.op == 'ASSIGN':
+                val = instr.arg1
+                if isinstance(val, str) and val.startswith('"') and val.endswith('"'):
+                    temp_types[t] = 'char*'
+                elif isinstance(val, str) and val.startswith('t') and val in temp_types:
+                    temp_types[t] = temp_types[val]
+        return temp_types
+
+    def _infer_method_return_type(self, func_name: str, instructions) -> str:
+        """Scan a method body's RETURN to determine C return type."""
+        temp_types = self._get_function_temp_types(func_name, instructions)
+        in_func = False
+        for instr in instructions:
+            if instr.op == 'FUNC_BEGIN' and str(instr.arg1) == func_name:
+                in_func = True
+                continue
+            if not in_func:
+                continue
+            if instr.op == 'FUNC_END':
+                break
+            if instr.op == 'RETURN' and instr.arg1 is not None:
+                val = instr.arg1
+                if isinstance(val, str) and val.startswith('"') and val.endswith('"'):
+                    return 'char*'
+                if isinstance(val, str) and val in temp_types:
+                    return temp_types[val]
+        return 'int'
+
+    def _determine_method_return_types(self, instructions):
+        """Populate self.method_return_types for every OO method."""
+        for func_name, cls in self.method_class_map.items():
+            if func_name.endswith('_ctor'):
+                self.method_return_types[func_name] = f"{cls}*"
+            else:
+                self.method_return_types[func_name] = self._infer_method_return_type(
+                    func_name, instructions)
+
+    def _get_global_temp_types(self, instructions) -> Dict[str, str]:
+        """Determine types of temp vars that appear in global (main) scope."""
+        temp_types: Dict[str, str] = {}
+        in_function = False
+        for instr in instructions:
+            if instr.op == 'FUNC_BEGIN':
+                in_function = True
+            elif instr.op == 'FUNC_END':
+                in_function = False
+            elif not in_function and instr.result and str(instr.result).startswith('t'):
+                t = str(instr.result)
+                if instr.op == 'METHOD_CALL':
+                    receiver = str(instr.arg1)
+                    method = str(instr.arg2)
+                    cls = self.var_types.get(receiver)
+                    if cls:
+                        actual = self._resolve_method_class(cls, method)
+                        if self.method_return_types.get(f"{actual}_{method}") == 'char*':
+                            temp_types[t] = 'char*'
+                elif instr.op == 'MEMBER_ACCESS':
+                    obj_cls = self.var_types.get(str(instr.arg1))
+                    if obj_cls:
+                        ft = self._get_field_type(obj_cls, str(instr.arg2))
+                        if ft == 'char*':
+                            temp_types[t] = 'char*'
+        return temp_types
+
+    def _get_all_fields_for_struct(self, class_name: str):
+        """Return (name, minipar_type) for all fields including inherited ones (parent-first)."""
+        chain = []
+        cls = class_name
+        while cls:
+            info = self.classes.get(cls)
+            if not info:
+                break
+            chain.append(info['fields'])
+            cls = info.get('base')
+        all_fields = []
+        seen: set = set()
+        for fields in reversed(chain):
+            for fname, ftype in fields:
+                if fname not in seen:
+                    all_fields.append((fname, ftype))
+                    seen.add(fname)
+        return all_fields
+
     def _generate_struct_definitions(self):
-        """Emit C struct typedefs for each class."""
+        """Emit C struct typedefs for each class (child structs include parent fields)."""
         if not self.classes:
             return
         self.emit("// Class struct definitions")
-        for class_name, info in self.classes.items():
+        for class_name in self.classes:
+            all_fields = self._get_all_fields_for_struct(class_name)
             self.emit(f"typedef struct {class_name} {{")
             self.indent_level += 1
-            for fname, ftype in info['fields']:
-                self.emit(f"{self._minipar_type_to_c(ftype)} {fname};")
+            if all_fields:
+                for fname, ftype in all_fields:
+                    self.emit(f"{self._minipar_type_to_c(ftype)} {fname};")
+            else:
+                self.emit("char __empty;")  # C forbids empty structs
             self.indent_level -= 1
             self.emit(f"}} {class_name};")
         self.emit_blank()
@@ -321,7 +462,7 @@ class CCodeGenerator:
             if class_name:
                 non_this = [p for p in params if p != 'this']
                 param_parts = [f"{class_name}* this"] + [f"int {p}" for p in non_this]
-                ret = f"{class_name}*" if func_name.endswith('_ctor') else "int"
+                ret = self.method_return_types.get(func_name, "int")
                 self.emit(f"{ret} {func_name}({', '.join(param_parts)});")
             else:
                 param_list = ", ".join([f"int {p}" for p in params])
@@ -369,6 +510,8 @@ class CCodeGenerator:
                 self.label_map = {}
                 self.last_label = None
                 self.pending_params = []
+                self.pending_method_call = None
+                self._active_temp_types = {}
                 self.current_local_vars = {}
 
                 # Collect FORMAL parameters (not call arguments)
@@ -385,7 +528,7 @@ class CCodeGenerator:
                     self.var_types['this'] = class_name
                     non_this = [p for p in params if p != 'this']
                     param_parts = [f"{class_name}* this"] + [f"int {p}" for p in non_this]
-                    ret = f"{class_name}*" if func_name.endswith('_ctor') else "int"
+                    ret = self.method_return_types.get(func_name, "int")
                     self.emit(f"{ret} {func_name}({', '.join(param_parts)}) {{")
                 else:
                     param_list = ", ".join([f"int {p}" for p in params])
@@ -402,12 +545,15 @@ class CCodeGenerator:
                         local_temps.add(str(instructions[k].result))
                     k += 1
 
+                func_temp_types = self._get_function_temp_types(func_name, instructions)
                 if local_temps:
                     self.emit("// Temporary variables")
                     for temp in sorted(local_temps):
                         if temp in self.var_types:
                             cls = self.var_types[temp]
                             self.emit(f"{cls}* {temp} = NULL;")
+                        elif func_temp_types.get(temp) == 'char*':
+                            self.emit(f"char* {temp} = NULL;")
                         else:
                             self.emit(f"int {temp} = 0;")
 
@@ -442,6 +588,12 @@ class CCodeGenerator:
 
                 if local_temps or local_vars:
                     self.emit_blank()
+
+                # For child class ctors: initialise inherited fields via parent ctor.
+                if func_name.endswith('_ctor') and class_name:
+                    base = self.classes.get(class_name, {}).get('base')
+                    if base and base in self.classes:
+                        self.emit(f"{base}_ctor(({base}*)this);")
 
                 # Generate function body (skip formal PARAM instructions)
                 j = i + 1
@@ -478,6 +630,8 @@ class CCodeGenerator:
         self.emit("int main() {")
         self.indent_level += 1
         self.last_label = None
+        self.pending_method_call = None
+        self._active_temp_types = {}
         self.current_local_vars = {}  # Reset for main function
         
         # Collect temps used in global scope
@@ -495,12 +649,15 @@ class CCodeGenerator:
                 if not in_function and instr.result and instr.result.startswith('t'):
                     global_temps.add(instr.result)
         
+        global_temp_types = self._get_global_temp_types(instructions)
         if global_temps:
             self.emit("// Temporary variables")
             for temp in sorted(global_temps):
                 if temp in self.var_types:
                     cls = self.var_types[temp]
                     self.emit(f"{cls}* {temp} = NULL;")
+                elif global_temp_types.get(temp) == 'char*':
+                    self.emit(f"char* {temp} = NULL;")
                 else:
                     self.emit(f"int {temp} = 0;")
             self.emit_blank()
@@ -530,7 +687,7 @@ class CCodeGenerator:
         op = instr.op
         
         # Skip function boundary markers and class metadata
-        if op in ['FUNC_BEGIN', 'FUNC_END', 'CLASS_BEGIN', 'CLASS_END', 'FIELD', 'METHOD_ARGS']:
+        if op in ['FUNC_BEGIN', 'FUNC_END', 'CLASS_BEGIN', 'CLASS_END', 'FIELD']:
             return
         
         # Handle PARAM instructions - collect them for the next CALL
@@ -629,6 +786,9 @@ class CCodeGenerator:
                         elif p in self.global_vars and self.global_vars[p] == 'char*':
                             format_parts.append("%s")
                             args.append(p)
+                        elif self._active_temp_types.get(str(p)) == 'char*':
+                            format_parts.append("%s")
+                            args.append(str(p))
                         else:
                             format_parts.append("%d")
                             args.append(formatted)
@@ -753,6 +913,10 @@ class CCodeGenerator:
             field = instr.arg2
             result = instr.result
             self.emit(f"{result} = {self._format_value(obj)}->{field};")
+            if result and str(result).startswith('t'):
+                obj_cls = self.var_types.get(str(obj))
+                if obj_cls and self._get_field_type(obj_cls, str(field)) == 'char*':
+                    self._active_temp_types[str(result)] = 'char*'
             return
 
         if op == 'MEMBER_STORE':
@@ -763,19 +927,36 @@ class CCodeGenerator:
             return
 
         if op == 'METHOD_CALL':
-            receiver = str(instr.arg1)
-            method = str(instr.arg2)
-            result = instr.result
+            # Defer emission: the immediately-following METHOD_ARGS tells us the arg count.
+            self.pending_method_call = (str(instr.arg1), str(instr.arg2), instr.result)
+            return
+
+        if op == 'METHOD_ARGS':
+            n_args = int(instr.arg1) if instr.arg1 is not None else 0
+            if self.pending_method_call is None:
+                return
+            receiver, method, result = self.pending_method_call
+            self.pending_method_call = None
+            # Pop exactly n_args from the tail of pending_params (method-specific args).
+            method_args = self.pending_params[-n_args:] if n_args > 0 else []
+            if n_args > 0:
+                self.pending_params = self.pending_params[:-n_args]
             cls = self.var_types.get(receiver)
-            method_args = [self._format_value(p) for p in self.pending_params]
-            self.pending_params = []
             if cls:
-                func_name = f"{cls}_{method}"
-                all_args = [self._format_value(receiver)] + method_args
+                actual_cls = self._resolve_method_class(cls, method)
+                resolved_func = f"{actual_cls}_{method}"
+                # Track result type for later use (e.g. printf format selection)
+                if result and str(result).startswith('t'):
+                    if self.method_return_types.get(resolved_func) == 'char*':
+                        self._active_temp_types[str(result)] = 'char*'
+                recv_expr = self._format_value(receiver)
+                if actual_cls != cls:
+                    recv_expr = f"({actual_cls}*){recv_expr}"
+                all_args = [recv_expr] + [self._format_value(p) for p in method_args]
                 if result:
-                    self.emit(f"{result} = {func_name}({', '.join(all_args)});")
+                    self.emit(f"{result} = {resolved_func}({', '.join(all_args)});")
                 else:
-                    self.emit(f"{func_name}({', '.join(all_args)});")
+                    self.emit(f"{resolved_func}({', '.join(all_args)});")
             else:
                 self.emit(f"// METHOD_CALL unresolved: {receiver}.{method}")
             return
