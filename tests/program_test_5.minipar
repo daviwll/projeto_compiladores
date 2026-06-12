@@ -14,7 +14,7 @@ func relu(x: number) -> number {
     return 0
 }
 
-# Verifica se 'item' pertence a 'lista' (a linguagem nao possui o operador 'in')
+# Verifica se 'item' pertence a 'lista'
 func contem(lista: list, item: string) -> bool {
     var i: number = 0
     while (i < len(lista)) {

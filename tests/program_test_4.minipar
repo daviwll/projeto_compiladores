@@ -2,7 +2,7 @@
 # Rede Neural que aprende a funcao XOR (camada oculta de 3 neuronios, 1 saida)
 # Treinada com feedforward e backpropagation. Baseado no codigo Python da especificacao.
 
-# --- Gerador pseudo-aleatorio (LCG), ja que a linguagem nao possui random ---
+# Gerador pseudo-aleatorio (LCG), ja que a linguagem nao possui random
 var seed: number = 12345
 
 func rand() -> number {
