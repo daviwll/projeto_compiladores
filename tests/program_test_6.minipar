@@ -1,0 +1,51 @@
+# Programa de Teste 6
+# Implementacao do metodo de ordenacao Quicksort usando Classes e Objetos.
+# Baseado no codigo Python da especificacao (classes Quicksort e InterfaceOrdenacao).
+
+class Quicksort {
+    var array: list = []
+
+    func Quicksort(array: list) -> void {
+        this.array = array
+    }
+
+    func ordenar() -> list {
+        return this._quicksort(this.array)
+    }
+
+    func _quicksort(array: list) -> list {
+        if (len(array) <= 1) {
+            return array
+        }
+        var pivot: any = array[0]
+        var menores: list = []
+        var maiores: list = []
+        for (var x: any in array[1:]) {
+            if (x <= pivot) {
+                menores.append(x)
+            } else {
+                maiores.append(x)
+            }
+        }
+        return this._quicksort(menores) + [pivot] + this._quicksort(maiores)
+    }
+}
+
+class InterfaceOrdenacao {
+    func iniciar() -> void {
+        print("==== Ordenacao com Quicksort ====")
+        print("Insira os elementos do vetor separados por espaco:")
+
+        var entrada: string = input()
+        var partes: list = entrada.split(" ")
+        var array: list = [for (var n: string in partes) -> to_number(n.strip())]
+        print("Vetor original:", array)
+
+        var algoritmo: Quicksort = new Quicksort(array)
+        var vetor_ordenado: list = algoritmo.ordenar()
+        print("Vetor ordenado:", vetor_ordenado)
+    }
+}
+
+var interface: InterfaceOrdenacao = new InterfaceOrdenacao()
+interface.iniciar()

@@ -1,0 +1,53 @@
+# Programa de Teste 9
+# Quicksort NAO recursivo (iterativo) de um array com 5 elementos.
+# A pilha de subintervalos (inicio, fim) e representada por duas listas paralelas.
+# Somente usando funcoes da Linguagem MINIPAR. Exercita atribuicao indexada arr[i] = x.
+
+func quicksort_iterativo(arr: list) -> void {
+    # Pilha de intervalos (inicio, fim) em duas listas paralelas
+    var pilha_inicio: list = []
+    var pilha_fim: list = []
+
+    pilha_inicio.append(0)
+    pilha_fim.append(len(arr) - 1)
+
+    while (len(pilha_inicio) > 0) {
+        var start: number = pilha_inicio.pop()
+        var end: number = pilha_fim.pop()
+
+        if (start >= end) {
+            continue
+        }
+
+        # Particionamento (pivot = arr[end])
+        var pivot: number = arr[end]
+        var i: number = start - 1
+
+        var j: number = start
+        while (j < end) {
+            if (arr[j] <= pivot) {
+                i = i + 1
+                var tmp: number = arr[i]
+                arr[i] = arr[j]
+                arr[j] = tmp
+            }
+            j = j + 1
+        }
+
+        i = i + 1
+        var tmp2: number = arr[i]
+        arr[i] = arr[end]
+        arr[end] = tmp2
+
+        # Empilha os subintervalos a esquerda e a direita do pivo
+        pilha_inicio.append(start)
+        pilha_fim.append(i - 1)
+        pilha_inicio.append(i + 1)
+        pilha_fim.append(end)
+    }
+}
+
+# Exemplo de ordenacao com 5 elementos
+var array: list = [33, 12, 98, 5, 61]
+quicksort_iterativo(array)
+print("Array ordenado:", array)

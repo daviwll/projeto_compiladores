@@ -1,22 +1,134 @@
 # Programa de Teste 4
-# Implementação da Série de Fibonacci
-# Baseado no código Python fornecido
+# Rede Neural que aprende a funcao XOR (camada oculta de 3 neuronios, 1 saida)
+# Treinada com feedforward e backpropagation. Baseado no codigo Python da especificacao.
 
-print("Série de Fibonacci com 5 termos")
+# --- Gerador pseudo-aleatorio (LCG), ja que a linguagem nao possui random ---
+var seed: number = 12345
 
-var n: number = 5
-var a: number = 0
-var b: number = 1
-var i: number = 0
-
-# Imprimir série de Fibonacci
-print("Série de Fibonacci com", n, "termos:")
-
-while(i < n)
-{
-  print(a)
-  var proximo: number = a + b
-  a = b
-  b = proximo
-  i = i + 1
+func rand() -> number {
+    seed = (seed * 1103515245 + 12345) % 2147483648
+    return seed / 2147483648
 }
+
+func sigmoid(x: number) -> number {
+    return 1 / (1 + exp(-x))
+}
+
+class Neuronio {
+    var pesos: list = []
+    var bias: number = 0
+    var saida: number = 0
+
+    func Neuronio(num_inputs: number) -> void {
+        this.pesos = []
+        var i: number = 0
+        while (i < num_inputs) {
+            this.pesos.append(rand())
+            i = i + 1
+        }
+        this.bias = rand()
+    }
+
+    func feedforward(entradas: list) -> number {
+        var soma: number = 0
+        var i: number = 0
+        while (i < len(entradas)) {
+            soma = soma + (entradas[i] * this.pesos[i])
+            i = i + 1
+        }
+        soma = soma + this.bias
+        this.saida = sigmoid(soma)
+        return this.saida
+    }
+
+    func calcular_derivada() -> number {
+        return this.saida * (1 - this.saida)
+    }
+}
+
+class RedeNeural {
+    var taxa_aprendizado: number = 0.5
+    var camada_oculta: list = []
+    var neuronio_saida: Neuronio
+    var saidas_ocultas: list = []
+    var saida_final: number = 0
+
+    func RedeNeural() -> void {
+        this.camada_oculta = []
+        var i: number = 0
+        while (i < 3) {
+            this.camada_oculta.append(new Neuronio(2))
+            i = i + 1
+        }
+        this.neuronio_saida = new Neuronio(3)
+    }
+
+    func feedforward(entradas: list) -> number {
+        this.saidas_ocultas = []
+        var i: number = 0
+        while (i < len(this.camada_oculta)) {
+            var n: Neuronio = this.camada_oculta[i]
+            this.saidas_ocultas.append(n.feedforward(entradas))
+            i = i + 1
+        }
+        this.saida_final = this.neuronio_saida.feedforward(this.saidas_ocultas)
+        return this.saida_final
+    }
+
+    func backpropagation(entradas: list, saida_desejada: number) -> void {
+        var erro: number = saida_desejada - this.saida_final
+        var delta_saida: number = erro * this.neuronio_saida.calcular_derivada()
+
+        # Atualiza pesos do neuronio de saida
+        var i: number = 0
+        while (i < len(this.neuronio_saida.pesos)) {
+            this.neuronio_saida.pesos[i] = this.neuronio_saida.pesos[i] + (this.saidas_ocultas[i] * delta_saida * this.taxa_aprendizado)
+            i = i + 1
+        }
+        this.neuronio_saida.bias = this.neuronio_saida.bias + (delta_saida * this.taxa_aprendizado)
+
+        # Atualiza pesos da camada oculta
+        i = 0
+        while (i < len(this.camada_oculta)) {
+            var neuronio: Neuronio = this.camada_oculta[i]
+            var delta_oculto: number = delta_saida * this.neuronio_saida.pesos[i] * neuronio.calcular_derivada()
+            var j: number = 0
+            while (j < len(neuronio.pesos)) {
+                neuronio.pesos[j] = neuronio.pesos[j] + (entradas[j] * delta_oculto * this.taxa_aprendizado)
+                j = j + 1
+            }
+            neuronio.bias = neuronio.bias + (delta_oculto * this.taxa_aprendizado)
+            i = i + 1
+        }
+    }
+
+    func treinar(entradas: list, saidas_desejadas: list, epocas: number) -> void {
+        var e: number = 0
+        while (e < epocas) {
+            var k: number = 0
+            while (k < len(entradas)) {
+                this.feedforward(entradas[k])
+                this.backpropagation(entradas[k], saidas_desejadas[k])
+                k = k + 1
+            }
+            e = e + 1
+        }
+    }
+
+    func testar(entradas: list) -> void {
+        var k: number = 0
+        while (k < len(entradas)) {
+            var resultado: number = this.feedforward(entradas[k])
+            print("Input:", entradas[k], "Predicted Output:", resultado)
+            k = k + 1
+        }
+    }
+}
+
+# Dados XOR
+var entradas: list = [[0, 0], [0, 1], [1, 0], [1, 1]]
+var saidas_desejadas: list = [0, 1, 1, 0]
+
+var rede: RedeNeural = new RedeNeural()
+rede.treinar(entradas, saidas_desejadas, 5000)
+rede.testar(entradas)

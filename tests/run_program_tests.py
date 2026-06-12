@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Test runner for program_test_1 through program_test_4, plus OO acceptance tests.
+Test runner for program_test_1 through program_test_9 (todos os programas de
+teste da especificação MiniPar 2026.1), mais os testes de aceitação de OO.
 """
 
 import sys
@@ -21,7 +22,7 @@ TESTS_DIR = os.path.dirname(__file__)
 
 
 def test_program(test_num, description):
-    """Compile one of the four canonical program test files."""
+    """Compile one of the canonical program test files (1-9)."""
     test_file = f"program_test_{test_num}.minipar"
     test_path = os.path.join(TESTS_DIR, test_file)
 
@@ -175,8 +176,13 @@ def main():
     procedural_tests = [
         (1, "Cliente-Servidor Calculadora com c_channel"),
         (2, "Execução Paralela: Fatorial e Fibonacci (PAR)"),
-        (3, "Fatorial Iterativo"),
-        (4, "Série de Fibonacci"),
+        (3, "Neurônio (perceptron) com Classes e Objetos"),
+        (4, "Rede Neural XOR (feedforward + backpropagation)"),
+        (5, "Sistema de Recomendação com Rede Neural (Classes)"),
+        (6, "Quicksort com Classes e Objetos"),
+        (7, "Fatorial Iterativo (gera Assembly ARMv7)"),
+        (8, "Série de Fibonacci (gera Assembly ARMv7)"),
+        (9, "Quicksort Iterativo (atribuição indexada, gera ARMv7)"),
     ]
 
     results = []

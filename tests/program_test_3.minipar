@@ -1,19 +1,59 @@
 # Programa de Teste 3
-# Implementação do fatorial de forma iterativa
-# Baseado no código Python fornecido
+# Implementacao de um Neuronio (perceptron) utilizando Classes e Objetos
+# Baseado no codigo Python fornecido na especificacao
 
-print("Cálculo do Fatorial de 5 - Iterativo")
+class Neuronio {
+    var input_val: number = 0
+    var output_desejado: number = 0
+    var peso: number = 0.5
+    var bias: number = 1
+    var peso_bias: number = 0.5
+    var taxa_aprendizado: number = 0.01
+    var erro: number = 999999
+    var iteracao: number = 0
 
-var numero: number = 5
-var fatorial: number = 1
-var i: number = 1
+    # Construtor: recebe a entrada e a saida desejada
+    func Neuronio(input_val: number, output_desejado: number) -> void {
+        this.input_val = input_val
+        this.output_desejado = output_desejado
+    }
 
-# Cálculo iterativo do fatorial
-while(i <= numero)
-{
-  fatorial = fatorial * i
-  i = i + 1
+    # Funcao de ativacao (degrau): 1 se soma >= 0, senao 0
+    func ativacao(soma: number) -> number {
+        if (soma >= 0) {
+            return 1
+        }
+        return 0
+    }
+
+    # Treinamento do neuronio ate o erro ser zero
+    func treinar() -> void {
+        print("Entrada:", this.input_val, "| Saida desejada:", this.output_desejado)
+        while (this.erro != 0) {
+            this.iteracao = this.iteracao + 1
+            print("")
+            print("#### Iteracao:", this.iteracao)
+            print("Peso:", this.peso)
+
+            var soma: number = (this.input_val * this.peso) + (this.bias * this.peso_bias)
+            var saida: number = this.ativacao(soma)
+            print("Saida:", saida)
+
+            this.erro = this.output_desejado - saida
+            print("Erro:", this.erro)
+
+            if (this.erro != 0) {
+                this.peso = this.peso + (this.taxa_aprendizado * this.input_val * this.erro)
+                print("Peso do bias:", this.peso_bias)
+                this.peso_bias = this.peso_bias + (this.taxa_aprendizado * this.bias * this.erro)
+            }
+        }
+        print("")
+        print("Parabens! O neuronio aprendeu.")
+        print("Valor desejado:", this.output_desejado)
+    }
 }
 
-# Imprimir resultado
-print("O fatorial de", numero, "é", fatorial)
+# Exemplo de uso
+var neuronio: Neuronio = new Neuronio(1, 0)
+neuronio.treinar()

@@ -1,0 +1,213 @@
+# Programa de Teste 5
+# Sistema de Recomendacao (e-commerce) com Rede Neural, usando Classes e Objetos.
+# A rede faz a propagacao direta (forward) com ReLU na camada oculta e
+# sigmoide na camada de saida. Baseado no codigo Python da especificacao.
+
+func sigmoid(x: number) -> number {
+    return 1 / (1 + exp(-x))
+}
+
+func relu(x: number) -> number {
+    if (x > 0) {
+        return x
+    }
+    return 0
+}
+
+# Verifica se 'item' pertence a 'lista' (a linguagem nao possui o operador 'in')
+func contem(lista: list, item: string) -> bool {
+    var i: number = 0
+    while (i < len(lista)) {
+        if (lista[i] == item) {
+            return true
+        }
+        i = i + 1
+    }
+    return false
+}
+
+class Produto {
+    var nome: string = ""
+    func Produto(nome: string) -> void {
+        this.nome = nome
+    }
+}
+
+class Categoria {
+    var nome: string = ""
+    var produtos: list = []
+    func Categoria(nome: string, produtos: list) -> void {
+        this.nome = nome
+        this.produtos = produtos
+    }
+}
+
+class Usuario {
+    var historico_compras: list = []
+    func Usuario(historico_compras: list) -> void {
+        this.historico_compras = historico_compras
+    }
+
+    # Codifica o historico como vetor binario sobre todos os produtos
+    func codificar_historico(todos_produtos: list) -> list {
+        var codificacao: list = []
+        var i: number = 0
+        while (i < len(todos_produtos)) {
+            if (contem(this.historico_compras, todos_produtos[i])) {
+                codificacao.append(1)
+            } else {
+                codificacao.append(0)
+            }
+            i = i + 1
+        }
+        return codificacao
+    }
+}
+
+class RedeNeural {
+    var input_size: number = 0
+    var hidden_size: number = 0
+    var output_size: number = 0
+    var W1: list = []
+    var b1: list = []
+    var W2: list = []
+    var b2: list = []
+
+    func RedeNeural(input_size: number, hidden_size: number, output_size: number) -> void {
+        this.input_size = input_size
+        this.hidden_size = hidden_size
+        this.output_size = output_size
+
+        # Pesos fixos em 0.5 (deterministico), como no codigo de referencia
+        this.W1 = []
+        var i: number = 0
+        while (i < input_size) {
+            var linha: list = []
+            var j: number = 0
+            while (j < hidden_size) {
+                linha.append(0.5)
+                j = j + 1
+            }
+            this.W1.append(linha)
+            i = i + 1
+        }
+        this.b1 = []
+        i = 0
+        while (i < hidden_size) {
+            this.b1.append(0.5)
+            i = i + 1
+        }
+        this.W2 = []
+        i = 0
+        while (i < hidden_size) {
+            var linha2: list = []
+            var j2: number = 0
+            while (j2 < output_size) {
+                linha2.append(0.5)
+                j2 = j2 + 1
+            }
+            this.W2.append(linha2)
+            i = i + 1
+        }
+        this.b2 = []
+        i = 0
+        while (i < output_size) {
+            this.b2.append(0.5)
+            i = i + 1
+        }
+    }
+
+    func forward(X: list) -> list {
+        # Camada oculta: Z1 = X . W1 + b1 ; A1 = relu(Z1)
+        var A1: list = []
+        var h: number = 0
+        while (h < this.hidden_size) {
+            var soma: number = 0
+            var k: number = 0
+            while (k < len(X)) {
+                soma = soma + (X[k] * this.W1[k][h])
+                k = k + 1
+            }
+            soma = soma + this.b1[h]
+            A1.append(relu(soma))
+            h = h + 1
+        }
+
+        # Camada de saida: Z2 = A1 . W2 + b2 ; A2 = sigmoid(Z2)
+        var A2: list = []
+        var o: number = 0
+        while (o < this.output_size) {
+            var soma2: number = 0
+            var k2: number = 0
+            while (k2 < len(A1)) {
+                soma2 = soma2 + (A1[k2] * this.W2[k2][o])
+                k2 = k2 + 1
+            }
+            soma2 = soma2 + this.b2[o]
+            A2.append(sigmoid(soma2))
+            o = o + 1
+        }
+        return A2
+    }
+}
+
+class Recomendador {
+    var usuario: Usuario
+    var categorias: list = []
+    var todos_produtos: list = []
+
+    func Recomendador(usuario: Usuario, categorias: list) -> void {
+        this.usuario = usuario
+        this.categorias = categorias
+        this.todos_produtos = []
+        var i: number = 0
+        while (i < len(categorias)) {
+            var cat: Categoria = categorias[i]
+            var j: number = 0
+            while (j < len(cat.produtos)) {
+                var p: Produto = cat.produtos[j]
+                this.todos_produtos.append(p.nome)
+                j = j + 1
+            }
+            i = i + 1
+        }
+    }
+
+    func recomendar() -> list {
+        var entrada: list = this.usuario.codificar_historico(this.todos_produtos)
+        var rede: RedeNeural = new RedeNeural(len(entrada), 10, len(entrada))
+        var saida: list = rede.forward(entrada)
+
+        var recomendacoes: list = []
+        var i: number = 0
+        while (i < len(saida)) {
+            var nome: string = this.todos_produtos[i]
+            if (saida[i] > 0.5) {
+                if (contem(this.usuario.historico_compras, nome) == false) {
+                    recomendacoes.append(nome)
+                }
+            }
+            i = i + 1
+        }
+        return recomendacoes
+    }
+}
+
+# ---------- Execucao ----------
+var eletronicos: Categoria = new Categoria("Eletronicos", [new Produto("Smartphone"), new Produto("Laptop"), new Produto("Tablet"), new Produto("Fones de ouvido")])
+var roupas: Categoria = new Categoria("Roupas", [new Produto("Camisa"), new Produto("Jeans"), new Produto("Jaqueta"), new Produto("Sapatos")])
+var eletro: Categoria = new Categoria("Eletrodomesticos", [new Produto("Geladeira"), new Produto("Micro-ondas"), new Produto("Maquina de lavar"), new Produto("Ar condicionado")])
+var livros: Categoria = new Categoria("Livros", [new Produto("Ficcao"), new Produto("Nao-ficcao"), new Produto("Ficcao cientifica"), new Produto("Fantasia")])
+
+var categorias: list = [eletronicos, roupas, eletro, livros]
+var usuario: Usuario = new Usuario(["Smartphone", "Jeans", "Micro-ondas", "Ficcao"])
+
+var recomendador: Recomendador = new Recomendador(usuario, categorias)
+var recomendacoes: list = recomendador.recomendar()
+
+print("Produtos recomendados para voce:")
+var i: number = 0
+while (i < len(recomendacoes)) {
+    print(recomendacoes[i])
+    i = i + 1
+}
