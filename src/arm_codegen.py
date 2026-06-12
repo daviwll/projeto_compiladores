@@ -388,8 +388,7 @@ class ARMCodeGenerator:
         
         # Arithmetic: +, -, *
         if op in ['+', '-', '*']:
-            left_reg = self._load_value_to_register(instr.arg1)
-            right_reg = self._load_value_to_register(instr.arg2)
+            left_reg, right_reg = self._load_binop_operands(instr.arg1, instr.arg2)
             dest_reg = self._allocate_register(instr.result)
             
             if op == '+':
@@ -402,8 +401,7 @@ class ARMCodeGenerator:
         
         # Division - use __aeabi_idiv
         if op == '/':
-            left_reg = self._load_value_to_register(instr.arg1)
-            right_reg = self._load_value_to_register(instr.arg2)
+            left_reg, right_reg = self._load_binop_operands(instr.arg1, instr.arg2)
             dest_reg = self._allocate_register(instr.result)
             
             # Move operands to r0, r1 for division routine
@@ -418,8 +416,7 @@ class ARMCodeGenerator:
         
         # Modulo - use __aeabi_idivmod
         if op == '%':
-            left_reg = self._load_value_to_register(instr.arg1)
-            right_reg = self._load_value_to_register(instr.arg2)
+            left_reg, right_reg = self._load_binop_operands(instr.arg1, instr.arg2)
             dest_reg = self._allocate_register(instr.result)
             
             # Move operands to r0, r1 for modulo routine
@@ -435,8 +432,7 @@ class ARMCodeGenerator:
         
         # Comparison operations
         if op in ['<', '>', '<=', '>=', '==', '!=']:
-            left_reg = self._load_value_to_register(instr.arg1)
-            right_reg = self._load_value_to_register(instr.arg2)
+            left_reg, right_reg = self._load_binop_operands(instr.arg1, instr.arg2)
             dest_reg = self._allocate_register(instr.result)
             
             self.text_section.append(f"    cmp {left_reg}, {right_reg}")
@@ -463,8 +459,7 @@ class ARMCodeGenerator:
         
         # Logical operations
         if op in ['&&', '||']:
-            left_reg = self._load_value_to_register(instr.arg1)
-            right_reg = self._load_value_to_register(instr.arg2)
+            left_reg, right_reg = self._load_binop_operands(instr.arg1, instr.arg2)
             dest_reg = self._allocate_register(instr.result)
             
             if op == '&&':
@@ -526,7 +521,15 @@ class ARMCodeGenerator:
             dest_reg = self._allocate_register(instr.result)
             self.text_section.append(f"    ldrb {dest_reg}, [{obj_reg}, {index_reg}]")
             return
-        
+
+        # INDEX_STORE - array element assignment: arr[index] = value
+        if op == 'INDEX_STORE':
+            obj_reg = self._load_value_to_register(instr.arg1)
+            index_reg = self._load_value_to_register(instr.arg2)
+            val_reg = self._load_value_to_register(str(instr.result))
+            self.text_section.append(f"    strb {val_reg}, [{obj_reg}, {index_reg}]")
+            return
+
         # OO operations
         if op == 'NEW_OBJECT':
             cls = str(instr.arg1)
@@ -712,6 +715,20 @@ class ARMCodeGenerator:
         # Use r0-r3 for temporaries (caller-saved)
         # r0 is safest as it's used for return values
         return "r0"
+
+    def _load_binop_operands(self, arg1, arg2):
+        """
+        Load the two operands of a binary operation into *distinct* registers.
+
+        Loading both through the default temp register (r0) would make the
+        second load clobber the first (e.g. `cmp r0, r0`). We pin the left
+        operand to r0 and the right one to r1 (or r2 if the left already
+        resolved to r1), guaranteeing two different registers.
+        """
+        left_reg = self._load_value_to_register(arg1, prefer_reg='r0')
+        right_prefer = 'r1' if left_reg != 'r1' else 'r2'
+        right_reg = self._load_value_to_register(arg2, prefer_reg=right_prefer)
+        return left_reg, right_reg
     
     def _generate_builtin_stubs(self):
         """Generate stub implementations for built-in functions"""

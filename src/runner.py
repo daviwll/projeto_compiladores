@@ -3,6 +3,7 @@ Minipar Runtime Executor
 Executes Minipar programs with support for channels, parallel execution, and more
 """
 
+import math
 import socket
 import threading
 import time
@@ -71,6 +72,41 @@ class VariableTable:
         self.table[name] = value
 
 
+class MiniparObject:
+    """Runtime instance of a Minipar class"""
+    def __init__(self, class_name: str):
+        self.class_name = class_name
+        self.fields: Dict[str, Any] = {}
+
+    def __repr__(self):
+        pairs = ', '.join(f"{k}={v!r}" for k, v in self.fields.items())
+        return f"{self.class_name}({pairs})"
+
+
+class ObjectScope(VariableTable):
+    """Method scope: bare names fall back to the receiver's fields"""
+    def __init__(self, obj: MiniparObject, parent=None):
+        super().__init__(parent)
+        self.obj = obj
+
+    def get(self, name: str) -> Any:
+        if name in self.table:
+            return self.table[name]
+        if name in self.obj.fields:
+            return self.obj.fields[name]
+        if self.parent:
+            return self.parent.get(name)
+        raise NameError(f"Variable '{name}' not defined")
+
+    def set(self, name: str, value: Any):
+        if name in self.table:
+            self.table[name] = value
+        elif name in self.obj.fields:
+            self.obj.fields[name] = value
+        else:
+            super().set(name, value)
+
+
 class MiniparRunner:
     """Main runtime executor for Minipar programs"""
     
@@ -78,6 +114,8 @@ class MiniparRunner:
         self.global_scope = VariableTable()
         self.current_scope = self.global_scope
         self.functions: Dict[str, FuncDecl] = {}
+        self.classes: Dict[str, ClassDecl] = {}
+        self.this_stack: List['MiniparObject'] = []
         self.channels: Dict[str, socket.socket] = {}
         self.servers: Dict[str, threading.Thread] = {}
         
@@ -86,9 +124,19 @@ class MiniparRunner:
             'print': self._builtin_print,
             'input': self._builtin_input,
             'to_string': str,
-            'to_number': lambda x: int(x) if isinstance(x, str) else x,
+            'to_number': self._builtin_to_number,
             'to_bool': bool,
             'len': len,
+            'sleep': time.sleep,
+            'pow': lambda x, y: x ** y,
+            'sqrt': math.sqrt,
+            'abs': abs,
+            'exp': math.exp,
+            'max': max,
+            'min': min,
+            'round': round,
+            'isalpha': lambda s: isinstance(s, str) and s.isalpha(),
+            'isnum': lambda s: isinstance(s, str) and s.replace('.', '', 1).lstrip('-').isdigit(),
         }
     
     def run_file(self, filename: str):
@@ -141,6 +189,15 @@ class MiniparRunner:
     def _builtin_input(self, prompt=""):
         """Built-in input function"""
         return input(prompt)
+
+    def _builtin_to_number(self, x):
+        """Built-in to_number: convert string/number to int or float"""
+        if isinstance(x, str):
+            x = x.strip()
+            if '.' in x or 'e' in x or 'E' in x:
+                return float(x)
+            return int(x)
+        return x
     
     # Execution methods for each AST node type
     
@@ -173,6 +230,94 @@ class MiniparRunner:
         """Register function declaration"""
         self.functions[node.name] = node
         return None
+
+    # ----- Object orientation -----
+
+    def exec_ClassDecl(self, node: ClassDecl) -> Any:
+        """Register class declaration"""
+        self.classes[node.name] = node
+        return None
+
+    def _class_chain(self, class_name: str) -> List['ClassDecl']:
+        """Return [class, base, base-of-base, ...] for field/method lookup."""
+        chain = []
+        name = class_name
+        while name and name in self.classes:
+            cls = self.classes[name]
+            chain.append(cls)
+            name = cls.base_class
+        return chain
+
+    def _find_method(self, class_name: str, method_name: str):
+        """Find a method/constructor by name walking up the inheritance chain."""
+        for cls in self._class_chain(class_name):
+            for m in cls.methods:
+                m_name = getattr(m, 'name', None)
+                if m_name == method_name:
+                    return m
+        return None
+
+    def exec_ObjectCreation(self, node: 'ObjectCreation') -> Any:
+        """Execute object instantiation: new ClassName(args)"""
+        class_name = node.class_name
+        if class_name not in self.classes:
+            raise NameError(f"Class '{class_name}' not defined")
+
+        obj = MiniparObject(class_name)
+
+        # Initialize fields from base classes first, then the class itself
+        for cls in reversed(self._class_chain(class_name)):
+            for f in cls.fields:
+                obj.fields[f.name] = self.execute(f.initializer) if f.initializer else None
+
+        # Look for a constructor (a method whose name equals the class name)
+        ctor = self._find_method(class_name, class_name)
+        if ctor is not None:
+            args = [self.execute(arg) for arg in node.arguments]
+            self._invoke_method(obj, ctor, args)
+
+        return obj
+
+    def _invoke_method(self, obj: 'MiniparObject', method, args: List[Any]) -> Any:
+        """Run a class method/constructor with `obj` as receiver."""
+        previous_scope = self.current_scope
+        self.this_stack.append(obj)
+        self.current_scope = ObjectScope(obj, parent=self.global_scope)
+        try:
+            for param, value in zip(method.parameters, args):
+                self.current_scope.define(param.name, value)
+            try:
+                return self.execute(method.body)
+            except ReturnException as ret:
+                return ret.value
+        finally:
+            self.current_scope = previous_scope
+            self.this_stack.pop()
+
+    def exec_ThisRef(self, node: 'ThisRef') -> Any:
+        """Resolve 'this' to the current receiver object"""
+        if not self.this_stack:
+            raise RuntimeError("'this' used outside of a method")
+        return self.this_stack[-1]
+
+    def exec_MemberAccess(self, node: 'MemberAccess') -> Any:
+        """Execute attribute access: obj.field"""
+        obj = self.execute(node.object)
+        if isinstance(obj, MiniparObject):
+            if node.member in obj.fields:
+                return obj.fields[node.member]
+            raise AttributeError(
+                f"Object of class '{obj.class_name}' has no attribute '{node.member}'")
+        raise TypeError(f"Cannot access member '{node.member}' on {type(obj).__name__}")
+
+    def exec_MemberAssignment(self, node: 'MemberAssignment') -> Any:
+        """Execute attribute assignment: obj.field = value"""
+        obj = self.execute(node.object)
+        value = self.execute(node.value)
+        if isinstance(obj, MiniparObject):
+            obj.fields[node.member] = value
+            return value
+        raise TypeError(f"Cannot assign member '{node.member}' on {type(obj).__name__}")
     
     def exec_Assignment(self, node: Assignment) -> Any:
         """Execute assignment"""
@@ -180,6 +325,23 @@ class MiniparRunner:
         self.current_scope.set(node.name, value)
         return value
     
+    def exec_IndexedAssignment(self, node: 'IndexedAssignment') -> Any:
+        """Execute indexed assignment: arr[i] = value"""
+        obj = self.execute(node.object)
+        index = self.execute(node.index)
+        value = self.execute(node.value)
+
+        if isinstance(obj, list):
+            index = int(index)
+            if index < -len(obj) or index >= len(obj):
+                raise IndexError(f"List index out of range: {index}")
+            obj[index] = value
+        elif isinstance(obj, dict):
+            obj[index] = value
+        else:
+            raise TypeError(f"Cannot index-assign into {type(obj).__name__}")
+        return value
+
     def exec_IfStmt(self, node: IfStmt) -> Any:
         """Execute if statement"""
         condition = self.execute(node.condition)
@@ -684,6 +846,15 @@ class MiniparRunner:
             obj = self.execute(obj_ref)
         if obj is None:
             raise NameError(f"Object '{obj_name}' not found")
+
+        # User-defined class instance methods
+        if isinstance(obj, MiniparObject):
+            method = self._find_method(obj.class_name, method_name)
+            if method is None:
+                raise AttributeError(
+                    f"Class '{obj.class_name}' has no method '{method_name}'")
+            args = [self.execute(arg) for arg in node.arguments]
+            return self._invoke_method(obj, method, args)
 
         # List methods
         if isinstance(obj, list):

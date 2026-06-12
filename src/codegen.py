@@ -485,6 +485,14 @@ class CodeGenerator:
     def gen_SuperRef(self, node: 'SuperRef') -> str:
         return 'super'
 
+    def gen_IndexedAssignment(self, node: 'IndexedAssignment') -> str:
+        """Generate code for indexed assignment - arr[index] = value"""
+        obj = self.generate(node.object)
+        index = self.generate(node.index)
+        value = self.generate(node.value)
+        self.emit('INDEX_STORE', obj, index, value)
+        return value
+
     def gen_IndexAccess(self, node: 'IndexAccess') -> str:
         """Generate code for index access - arr[index]"""
         obj = self.generate(node.object)

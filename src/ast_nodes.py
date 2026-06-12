@@ -239,6 +239,14 @@ class IndexAccess(ASTNode):
 
 
 @dataclass
+class IndexedAssignment(ASTNode):
+    """Assignment to an indexed element: arr[index] = value"""
+    object: ASTNode
+    index: ASTNode
+    value: ASTNode
+
+
+@dataclass
 class SliceAccess(ASTNode):
     """Array/string slice access - arr[start:end]"""
     object: ASTNode  # Object being sliced

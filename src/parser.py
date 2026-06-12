@@ -401,6 +401,8 @@ class Parser:
                 return Assignment(expr.name, value)
             elif isinstance(expr, MemberAccess):
                 return MemberAssignment(expr.object, expr.member, value)
+            elif isinstance(expr, IndexAccess):
+                return IndexedAssignment(expr.object, expr.index, value)
             else:
                 self.error("Invalid assignment target")
         

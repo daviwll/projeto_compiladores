@@ -44,6 +44,10 @@ class SemanticAnalyzer:
             ("pow", "number", ["number", "number"]),
             ("sqrt", "number", ["number"]),
             ("abs", "number", ["number"]),
+            ("exp", "number", ["number"]),
+            ("max", "number", ["number", "number"]),
+            ("min", "number", ["number", "number"]),
+            ("round", "number", ["number"]),
             # String functions
             ("isalpha", "bool", ["string"]),
             ("isnum", "bool", ["string"]),
@@ -125,6 +129,28 @@ class SemanticAnalyzer:
         for field in node.fields:
             self.visit(field)
 
+        # Pre-register all method/constructor signatures so that methods may
+        # call one another regardless of declaration order (forward references).
+        class_info = self.class_registry[node.name]
+        for member in node.methods:
+            if isinstance(member, ConstructorDecl):
+                if class_info['constructor'] is not None:
+                    self.add_error(f"Class '{node.name}' already has a constructor")
+                else:
+                    class_info['constructor'] = {
+                        'param_types': [p.type for p in member.parameters],
+                        'return_type': node.name,
+                    }
+            else:  # MethodDecl
+                if member.name in class_info['methods']:
+                    self.add_error(
+                        f"Method '{member.name}' already declared in class '{node.name}'")
+                else:
+                    class_info['methods'][member.name] = {
+                        'return_type': member.return_type,
+                        'param_types': [p.type for p in member.parameters],
+                    }
+
         for member in node.methods:
             self.visit(member)
 
@@ -164,15 +190,8 @@ class SemanticAnalyzer:
             return None
 
         class_info = self.class_registry[self.current_class]
-        if node.name in class_info['methods']:
-            self.add_error(f"Method '{node.name}' already declared in class '{self.current_class}'")
-            return
-
+        # Signature was already registered in visit_ClassDecl (pre-pass)
         param_types = [param.type for param in node.parameters]
-        class_info['methods'][node.name] = {
-            'return_type': node.return_type,
-            'param_types': param_types,
-        }
 
         self.symbol_table.add_symbol(
             node.name, SymbolType.METHOD, node.return_type,
@@ -186,18 +205,19 @@ class SemanticAnalyzer:
             line=0, is_initialized=True
         )
 
-        for field_name, field_type in class_info['fields'].items():
-            self.symbol_table.add_symbol(
-                field_name, SymbolType.FIELD, field_type,
-                line=0, is_initialized=True
-            )
-
+        # Parameters first so they shadow fields with the same name
         for param in node.parameters:
-            if self.symbol_table.lookup_local(param.name):
+            if not self.symbol_table.add_symbol(
+                param.name, SymbolType.PARAMETER, param.type,
+                line=0, is_initialized=True
+            ):
                 self.add_error(f"Parameter '{param.name}' already declared")
-            else:
+
+        # Fields are reachable by bare name unless shadowed by a parameter
+        for field_name, field_type in class_info['fields'].items():
+            if not self.symbol_table.lookup_local(field_name):
                 self.symbol_table.add_symbol(
-                    param.name, SymbolType.PARAMETER, param.type,
+                    field_name, SymbolType.FIELD, field_type,
                     line=0, is_initialized=True
                 )
 
@@ -213,29 +233,34 @@ class SemanticAnalyzer:
             return None
 
         class_info = self.class_registry[self.current_class]
-        if class_info['constructor'] is not None:
-            self.add_error(f"Class '{self.current_class}' already has a constructor")
-            return
-
-        param_types = [param.type for param in node.parameters]
-        class_info['constructor'] = {
-            'param_types': param_types,
-            'return_type': self.current_class,
-        }
+        # Signature was already registered in visit_ClassDecl (pre-pass)
 
         self.symbol_table.add_symbol(
             node.name, SymbolType.CONSTRUCTOR, self.current_class,
             line=0, is_initialized=True,
-            param_types=param_types, return_type=self.current_class
+            param_types=[param.type for param in node.parameters],
+            return_type=self.current_class
         )
 
         self.symbol_table.enter_scope(f"ctor_{node.name}")
+        self.symbol_table.add_symbol(
+            'this', SymbolType.INSTANCE, self.current_class,
+            line=0, is_initialized=True
+        )
+
+        # Parameters first so they shadow fields with the same name
         for param in node.parameters:
-            if self.symbol_table.lookup_local(param.name):
+            if not self.symbol_table.add_symbol(
+                param.name, SymbolType.PARAMETER, param.type,
+                line=0, is_initialized=True
+            ):
                 self.add_error(f"Parameter '{param.name}' already declared")
-            else:
+
+        # Fields are reachable by bare name unless shadowed by a parameter
+        for field_name, field_type in class_info['fields'].items():
+            if not self.symbol_table.lookup_local(field_name):
                 self.symbol_table.add_symbol(
-                    param.name, SymbolType.PARAMETER, param.type,
+                    field_name, SymbolType.FIELD, field_type,
                     line=0, is_initialized=True
                 )
 
@@ -788,6 +813,18 @@ class SemanticAnalyzer:
                 )
             return field_type
         return "any"
+
+    def visit_IndexedAssignment(self, node: 'IndexedAssignment') -> str:
+        """Visit indexed assignment: arr[index] = value"""
+        obj_type = self.visit(node.object)
+        index_type = self.visit(node.index)
+        value_type = self.visit(node.value)
+
+        if obj_type not in ("list", "dict", "any"):
+            self.add_error(f"Cannot index-assign into type '{obj_type}'")
+        if obj_type == "list" and index_type not in ("number", "any"):
+            self.add_error(f"List index must be number, got {index_type}")
+        return value_type
 
     def visit_ThisRef(self, node: 'ThisRef') -> str:
         """Visit this reference"""
