@@ -520,12 +520,10 @@ Projeto educacional - Curso de Compiladores
 
 ## 🙏 Créditos
 
-- **Runtime Executor**: Implementado com suporte a canais e sockets
-- **Documentação**: Tutoriais completos e guias técnicos
-- **Exemplos**: Programas demonstrativos incluídos
+- Agradecemos aos alunos Hélio José Ribeiro Rêgo, Antônio Guilherme da Silva, e Gabriel Nathan Telaroli Dias Calixto do Instituto de Computação da UFAL, pela implementação original do compilador Minipar no período de 2025.1, que nós utilizamos como base.
 
 ---
 
 **Status**: ✅ Produção  
 **Versão**: 2.0  
-**Última Atualização**: 2025-10-23
+**Última Atualização**: 2026-06-14
