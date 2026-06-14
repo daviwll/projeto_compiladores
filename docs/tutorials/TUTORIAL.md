@@ -1,21 +1,43 @@
 # 🚀 Minipar Compiler - Complete Tutorial
 
-**A Step-by-Step Guide to Building and Running Your First Minipar Programs**
+**A Step-by-Step Guide to Building and Running Your First Minipar Programs — on Windows and Linux**
 
 ---
 
 ## 📋 Table of Contents
 
-1. [Prerequisites](#prerequisites)
-2. [Installation](#installation)
-3. [Quick Start](#quick-start)
-4. [Tutorial 1: Hello World](#tutorial-1-hello-world)
-5. [Tutorial 2: Variables and Functions](#tutorial-2-variables-and-functions)
-6. [Tutorial 3: Control Flow](#tutorial-3-control-flow)
-7. [Tutorial 4: Recursive Functions](#tutorial-4-recursive-functions)
-8. [Tutorial 5: Complete Compilation Pipeline](#tutorial-5-complete-compilation-pipeline)
-9. [Advanced Features](#advanced-features)
-10. [Troubleshooting](#troubleshooting)
+1. [Cross-Platform Conventions](#cross-platform-conventions)
+2. [Prerequisites](#prerequisites)
+3. [Installation](#installation)
+4. [Quick Start](#quick-start)
+5. [Tutorial 1: Hello World](#tutorial-1-hello-world)
+6. [Tutorial 2: Variables and Functions](#tutorial-2-variables-and-functions)
+7. [Tutorial 3: Control Flow](#tutorial-3-control-flow)
+8. [Tutorial 4: Recursive Functions](#tutorial-4-recursive-functions)
+9. [Tutorial 5: Complete Compilation Pipeline](#tutorial-5-complete-compilation-pipeline)
+10. [Advanced Features](#advanced-features)
+11. [Troubleshooting](#troubleshooting)
+
+---
+
+## Cross-Platform Conventions
+
+Every command in this tutorial works on **both Windows and Linux/macOS**. The only
+differences are the interpreter name, how you run the produced program, and a couple
+of shell built-ins. Use the column that matches your system:
+
+| Action | Linux / macOS | Windows |
+|--------|---------------|---------|
+| Run Python | `python3` (or `python`) | `py` (or `python`) |
+| Path separator | `/` (e.g. `src/compiler.py`) | `\` or `/` — Python accepts both |
+| Run the built program | `./output` | `.\output.exe` |
+| View a text file | `cat output.c` | `type output.c` |
+| List files | `ls` | `dir` |
+| Activate virtualenv | `source .venv/bin/activate` | `.venv\Scripts\activate` |
+
+> 💡 **Tip:** Forward slashes (`/`) work in paths on Windows too, so most commands are
+> identical across platforms — only the interpreter name and the *run* step really differ.
+> Where a command differs, this tutorial shows a **Linux/macOS** block and a **Windows** block.
 
 ---
 
@@ -23,64 +45,102 @@
 
 ### Required Software
 1. **Python 3.7+** - [Download](https://www.python.org/downloads/)
-2. **GCC Compiler** - For generating executables
-   - **Windows**: [MinGW](http://www.mingw.org/) or install via [MSYS2](https://www.msys2.org/)
-   - **Linux**: `sudo apt-get install gcc`
-   - **macOS**: Install Xcode Command Line Tools: `xcode-select --install`
+2. **GCC Compiler** - For generating native executables (the `--exe` step)
+   - **Linux (Debian/Ubuntu)**: `sudo apt-get install gcc`
+   - **Linux (Fedora/RHEL)**: `sudo dnf install gcc`
+   - **Linux (Arch)**: `sudo pacman -S gcc`
+   - **macOS**: `xcode-select --install`
+   - **Windows**: [MSYS2](https://www.msys2.org/) (recommended) or [MinGW](http://www.mingw.org/)
+
+> GCC is only required for the `--exe` (native executable) step. Tokenizing, parsing,
+> semantic analysis, TAC, C generation and ARM generation all work without GCC.
 
 ### Verify Installation
 
+**Linux/macOS:**
 ```bash
-# Check Python version
-python --version
-# or
-py --version
-
-# Check GCC installation
+python3 --version
 gcc --version
 ```
 
-Expected output:
+**Windows:**
+```bat
+py --version
+gcc --version
 ```
-Python 3.7.0 (or higher)
-gcc (MinGW.org GCC-6.3.0-1) 6.3.0 (or similar)
+
+Expected output (versions may differ):
+```
+Python 3.10.0 (or higher)
+gcc (GCC) 12.2.0 (or similar)
 ```
 
 ---
 
 ## Installation
 
-### Step 1: Navigate to Project Directory
+### Step 1: Navigate to the Project Directory
 
+**Linux/macOS:**
 ```bash
-cd C:\Users\gui\Documents\code\compiladores\projeto_compiladores
+cd ~/path/to/projeto_compiladores
 ```
 
-Or wherever you have the project.
+**Windows:**
+```bat
+cd C:\path\to\projeto_compiladores
+```
 
-### Step 2: Verify Project Structure
+### Step 2: (Optional) Create a Virtual Environment
 
+The compiler itself uses only the Python standard library, but the web interface and
+the test suite need a few packages. A virtualenv keeps them isolated.
+
+**Linux/macOS:**
 ```bash
-# Windows
-dir
+python3 -m venv .venv
+source .venv/bin/activate
+pip install flask pytest
+```
 
-# Linux/Mac
+**Windows:**
+```bat
+py -m venv .venv
+.venv\Scripts\activate
+pip install flask pytest
+```
+
+### Step 3: Verify the Project Structure
+
+**Linux/macOS:**
+```bash
 ls -la
+```
+
+**Windows:**
+```bat
+dir
 ```
 
 You should see:
 - `src/` folder (compiler source code)
 - `examples/` folder (example programs)
-- `README.md`
+- `compile.py`, `run_tests.py`, `README.md`
 - Other documentation files
 
-### Step 3: Test Compiler Installation
+### Step 4: Test the Compiler
 
+**Linux/macOS:**
 ```bash
-py src\compiler.py --help
+python3 compile.py
 ```
 
-Expected output: Usage information and available flags.
+**Windows:**
+```bat
+py compile.py
+```
+
+Expected output: usage information and the list of available flags.
 
 ---
 
@@ -88,27 +148,35 @@ Expected output: Usage information and available flags.
 
 ### Compile Your First Program (One Command)
 
+**Linux/macOS:**
 ```bash
-py src\compiler.py examples\ex5.minipar --exe
+python3 compile.py examples/ex5.minipar --exe
+```
+
+**Windows:**
+```bat
+py compile.py examples\ex5.minipar --exe
 ```
 
 This will:
 1. ✅ Tokenize the source code
-2. ✅ Parse and build AST
+2. ✅ Parse and build the AST
 3. ✅ Perform semantic analysis
 4. ✅ Generate TAC (Three-Address Code)
-5. ✅ Generate C code
-6. ✅ Compile with GCC
-7. ✅ Create executable
+5. ✅ Generate ARM assembly (`output.s`) — skip with `--no-asm`
+6. ✅ Generate C code (`output.c`)
+7. ✅ Compile with GCC into a native executable
 
 ### Run the Program
 
+**Linux/macOS:**
 ```bash
-# Windows
-.\output.exe
-
-# Linux/Mac
 ./output
+```
+
+**Windows:**
+```bat
+.\output.exe
 ```
 
 Expected output:
@@ -139,23 +207,38 @@ Create a new file called `hello.minipar`:
 ```minipar
 # hello.minipar - My first Minipar program
 
-func main() -> void {
+func greet() -> void {
     print("Hello, Minipar!")
     print("Welcome to compiler design!")
 }
 
-main()
+greet()
 ```
+
+> ⚠️ **Note:** Avoid naming a function `main` — it collides with C's `main()` in the
+> generated code. Use any other name (like `greet`) and call it at the top level.
 
 ### Step 2: Compile It
 
+**Linux/macOS:**
 ```bash
-py src\compiler.py hello.minipar --exe --output hello
+python3 compile.py hello.minipar --exe --output hello
+```
+
+**Windows:**
+```bat
+py compile.py hello.minipar --exe --output hello
 ```
 
 ### Step 3: Run It
 
+**Linux/macOS:**
 ```bash
+./hello
+```
+
+**Windows:**
+```bat
 .\hello.exe
 ```
 
@@ -167,14 +250,20 @@ Welcome to compiler design!
 
 ### Step 4: See the Intermediate Steps
 
+**Linux/macOS:**
 ```bash
-py src\compiler.py hello.minipar --tokens --ast --generate-c
+python3 compile.py hello.minipar --tokens --ast --generate-c
+```
+
+**Windows:**
+```bat
+py compile.py hello.minipar --tokens --ast --generate-c
 ```
 
 This shows you:
 - **Tokens**: How the lexer breaks down your code
 - **AST**: The parse tree structure
-- **C Code**: The generated C source
+- **C Code**: The generated C source (saved to `output.c`)
 
 ---
 
@@ -198,10 +287,10 @@ func multiply(a: number, b: number) -> number {
 func calculate() -> void {
     var x: number = 10
     var y: number = 5
-    
+
     var sum: number = add(x, y)
     var product: number = multiply(x, y)
-    
+
     print("Sum:", sum)
     print("Product:", product)
 }
@@ -211,8 +300,15 @@ calculate()
 
 ### Step 2: Compile and Run
 
+**Linux/macOS:**
 ```bash
-py src\compiler.py calculator.minipar --exe --output calculator
+python3 compile.py calculator.minipar --exe --output calculator
+./calculator
+```
+
+**Windows:**
+```bat
+py compile.py calculator.minipar --exe --output calculator
 .\calculator.exe
 ```
 
@@ -222,16 +318,19 @@ Sum: 15
 Product: 50
 ```
 
-### Step 3: Understand the Compilation Phases
+### Step 3: Inspect the Semantic Phase
 
+**Linux/macOS:**
 ```bash
-py src\compiler.py calculator.minipar --semantic
+python3 compile.py calculator.minipar --semantic
 ```
 
-This shows:
-- Type checking
-- Symbol table
-- Scope validation
+**Windows:**
+```bat
+py compile.py calculator.minipar --semantic
+```
+
+This shows type checking, the symbol table, and scope validation.
 
 ---
 
@@ -246,18 +345,18 @@ Create `loops.minipar`:
 
 func countdown(n: number) -> void {
     print("Starting countdown from", n)
-    
+
     while (n >= 0) {
         print(n)
         n = n - 1
     }
-    
+
     print("Liftoff!")
 }
 
 func count_even(limit: number) -> void {
     var i: number = 0
-    
+
     while (i <= limit) {
         if (i % 2 == 0) {
             print("Even:", i)
@@ -273,8 +372,15 @@ count_even(10)
 
 ### Step 2: Compile and Test
 
+**Linux/macOS:**
 ```bash
-py src\compiler.py loops.minipar --exe --output loops
+python3 compile.py loops.minipar --exe --output loops
+./loops
+```
+
+**Windows:**
+```bat
+py compile.py loops.minipar --exe --output loops
 .\loops.exe
 ```
 
@@ -318,10 +424,10 @@ func factorial(n: number) -> number {
 
 func test_factorial() -> void {
     var i: number = 0
-    
+
     print("Factorial Table:")
     print("----------------")
-    
+
     while (i <= 10) {
         var result: number = factorial(i)
         print("factorial(", i, ") =", result)
@@ -332,10 +438,17 @@ func test_factorial() -> void {
 test_factorial()
 ```
 
-### Step 2: Compile with Optimization
+### Step 2: Compile and Run
 
+**Linux/macOS:**
 ```bash
-py src\compiler.py factorial.minipar --exe --output factorial
+python3 compile.py factorial.minipar --exe --output factorial
+./factorial
+```
+
+**Windows:**
+```bat
+py compile.py factorial.minipar --exe --output factorial
 .\factorial.exe
 ```
 
@@ -362,17 +475,23 @@ factorial( 10 ) = 3628800
 
 ### Understanding All Stages
 
-Let's compile a program and see every step:
+Let's compile a program and see every step at once:
 
+**Linux/macOS:**
 ```bash
-py src\compiler.py examples\ex1.minipar --tokens --ast --semantic --generate-c --asm --exe --output complete_demo
+python3 compile.py examples/ex1.minipar --tokens --ast --semantic --generate-c --exe --output complete_demo
+```
+
+**Windows:**
+```bat
+py compile.py examples\ex1.minipar --tokens --ast --semantic --generate-c --exe --output complete_demo
 ```
 
 This performs:
 
 #### Phase 1: Lexical Analysis
 ```
-✓ Tokenization complete: 75 tokens
+✓ Tokenization complete
 ```
 Converts source code into tokens.
 
@@ -390,31 +509,37 @@ Validates types, scopes, and semantics.
 
 #### Phase 4: TAC Generation
 ```
-✓ Code generation complete: 28 instructions
+✓ Code generation complete
 ```
 Generates Three-Address Code.
 
-#### Phase 5: C Code Generation
+#### Phase 5: ARM Assembly Generation
 ```
-✓ C code generated: complete_demo.c
+✓ ARM assembly saved to: complete_demo.s
 ```
-Translates TAC to C code.
+Generates ARMv7 assembly (for CPUlator). Add `--no-asm` to skip this phase.
 
-#### Phase 6: Assembly Generation
+#### Phase 6: C Code Generation
 ```
-✓ Assembly generated: complete_demo.s
+✓ C code saved to: complete_demo.c
 ```
-GCC generates assembly code.
+Translates TAC to C source.
 
 #### Phase 7: Executable Generation
 ```
-✓ Executable generated: complete_demo.exe
+✓ Executable generated: complete_demo
 ```
-Final executable created.
+GCC compiles the C source into a native binary.
 
 ### Run the Complete Demo
 
+**Linux/macOS:**
 ```bash
+./complete_demo
+```
+
+**Windows:**
+```bat
 .\complete_demo.exe
 ```
 
@@ -422,63 +547,99 @@ Final executable created.
 
 ## Advanced Features
 
-### 1. Generate Only Assembly
+### 1. Inspect the Generated C Code
 
+**Linux/macOS:**
 ```bash
-py src\compiler.py examples\fatorial_rec.minipar --asm --output fatorial
-```
-
-This creates `fatorial.s` with optimized assembly code.
-
-**View the assembly:**
-```bash
-# Windows
-type fatorial.s
-
-# Linux/Mac
-cat fatorial.s
-```
-
-### 2. Inspect C Code
-
-```bash
-py src\compiler.py examples\ex5.minipar --generate-c --output program.c
-```
-
-**View the C code:**
-```bash
-# Windows
-type program.c
-
-# Linux/Mac
+python3 compile.py examples/ex5.minipar --generate-c --output program
 cat program.c
 ```
 
-### 3. Target Different Architectures
-
-```bash
-# Native architecture (default)
-py src\compiler.py program.minipar --asm --arch native
-
-# ARM architecture (requires cross-compiler)
-py src\compiler.py program.minipar --asm --arch armv7
-
-# x86-64 architecture
-py src\compiler.py program.minipar --asm --arch x86_64
+**Windows:**
+```bat
+py compile.py examples\ex5.minipar --generate-c --output program
+type program.c
 ```
 
-### 4. Debug Mode (All Intermediate Steps)
+### 2. Inspect the Generated ARM Assembly
 
+ARM assembly (`.s`) is generated **by default** alongside `--exe`/`--generate-c`.
+To view it:
+
+**Linux/macOS:**
 ```bash
-py src\compiler.py examples\ex1.minipar --tokens --ast --semantic --exe
+python3 compile.py examples/ex5.minipar --generate-c --output program
+cat program.s
 ```
 
-Shows:
-- All tokens
-- AST structure
-- Symbol table
-- Semantic validation
-- Complete compilation
+**Windows:**
+```bat
+py compile.py examples\ex5.minipar --generate-c --output program
+type program.s
+```
+
+To **skip** ARM generation, add `--no-asm`:
+
+```bash
+python3 compile.py examples/ex5.minipar --exe --no-asm
+```
+
+> The ARM backend targets [CPUlator](https://cpulator.01xz.net/). For details, see
+> [ARM_COMPILATION_GUIDE.md](ARM_COMPILATION_GUIDE.md).
+
+### 3. The Modern Subcommand CLI (`minipar_cli.py`)
+
+In addition to `compile.py`, the project ships a subcommand-based CLI. It works
+identically on both platforms (only the interpreter name changes):
+
+**Linux/macOS:**
+```bash
+python3 src/minipar_cli.py compile examples/ex1.minipar      # TAC
+python3 src/minipar_cli.py ast examples/fatorial_rec.minipar # AST
+python3 src/minipar_cli.py tac examples/ex5.minipar          # Three-Address Code
+python3 src/minipar_cli.py generate-c examples/ex5.minipar --out /tmp/ex5.c
+python3 src/minipar_cli.py generate-arm examples/ex5.minipar
+python3 src/minipar_cli.py test                              # full test suite
+```
+
+**Windows:**
+```bat
+py src\minipar_cli.py compile examples\ex1.minipar
+py src\minipar_cli.py ast examples\fatorial_rec.minipar
+py src\minipar_cli.py tac examples\ex5.minipar
+py src\minipar_cli.py generate-c examples\ex5.minipar --out %TEMP%\ex5.c
+py src\minipar_cli.py generate-arm examples\ex5.minipar
+py src\minipar_cli.py test
+```
+
+### 4. Run a Program Directly (Runtime Executor)
+
+To execute a program without producing a binary (and to use channels), use the runner:
+
+**Linux/macOS:**
+```bash
+python3 src/runner.py examples/ex5.minipar
+```
+
+**Windows:**
+```bat
+py src\runner.py examples\ex5.minipar
+```
+
+See [QUICK_START_CHANNELS.md](QUICK_START_CHANNELS.md) and
+[CHANNEL_TUTORIAL.md](CHANNEL_TUTORIAL.md) for client/server channel programs.
+
+### 5. Debug Mode (All Intermediate Steps)
+
+**Linux/macOS:**
+```bash
+python3 compile.py examples/ex1.minipar --tokens --ast --semantic --exe
+```
+
+**Windows:**
+```bat
+py compile.py examples\ex1.minipar --tokens --ast --semantic --exe
+```
 
 ---
 
@@ -488,18 +649,18 @@ Shows:
 
 Run all examples to verify everything works:
 
+**Linux/macOS:**
 ```bash
-# Test ex1
-py src\compiler.py examples\ex1.minipar --exe --output test_ex1
-.\test_ex1.exe
+python3 compile.py examples/ex1.minipar --exe --output test_ex1 && ./test_ex1
+python3 compile.py examples/ex5.minipar --exe --output test_ex5 && ./test_ex5
+python3 compile.py examples/fatorial_rec.minipar --exe --output test_factorial && ./test_factorial
+```
 
-# Test ex5
-py src\compiler.py examples\ex5.minipar --exe --output test_ex5
-.\test_ex5.exe
-
-# Test factorial
-py src\compiler.py examples\fatorial_rec.minipar --exe --output test_factorial
-.\test_factorial.exe
+**Windows:**
+```bat
+py compile.py examples\ex1.minipar --exe --output test_ex1 && .\test_ex1.exe
+py compile.py examples\ex5.minipar --exe --output test_ex5 && .\test_ex5.exe
+py compile.py examples\fatorial_rec.minipar --exe --output test_factorial && .\test_factorial.exe
 ```
 
 ### Expected Results
@@ -535,6 +696,21 @@ CALCULA O FATORIAL RECURSIVO
 Fatorial:  3628800
 ```
 
+### Run the Automated Test Suite
+
+**Linux/macOS:**
+```bash
+python3 run_tests.py
+# or, with pytest:
+python3 -m pytest -q
+```
+
+**Windows:**
+```bat
+py run_tests.py
+py -m pytest -q
+```
+
 ---
 
 ## Command-Line Reference
@@ -542,40 +718,31 @@ Fatorial:  3628800
 ### Basic Commands
 
 ```bash
-# Compile to executable
-py compile.py <file.minipar> --exe
+# Compile to a native executable (also writes output.c and output.s)
+python3 compile.py <file.minipar> --exe        # Windows: py compile.py ...
 
 # Generate C code only
-py compile.py <file.minipar> --generate-c
-```
-
-### Debug Flags
-
-```bash
---tokens      # Show token stream
---ast         # Show abstract syntax tree
---semantic    # Show semantic analysis details
-```
-
-### Output Options
-
-```bash
---output <name>    # Specify C output filename
+python3 compile.py <file.minipar> --generate-c
 ```
 
 ### Complete Flag List
 
 ```
-Usage: py compile.py <source_file> [options]
+Usage: python3 compile.py <source_file> [options]    (Windows: py compile.py ...)
 
 Options:
-  --tokens              Show token stream
-  --ast                 Show abstract syntax tree
-  --semantic            Show semantic analysis details
-  --generate-c          Generate C code
-  --output <file>       Specify C output file
-  --exe                 Compile to executable
+  --tokens          Show token stream
+  --ast             Show abstract syntax tree
+  --semantic        Show semantic analysis details
+  --generate-c      Generate C code (output.c)
+  --output <name>   Base name for generated files (default: output)
+  --exe             Compile to a native executable via GCC
+  --no-asm          Skip ARM assembly generation (ARM is generated by default)
 ```
+
+> ℹ️ The older `--asm` and `--arch` flags have been **removed**. ARM assembly is now
+> emitted automatically (unless you pass `--no-asm`), and native executables are built
+> for your current machine via GCC.
 
 ---
 
@@ -591,19 +758,16 @@ projeto_compiladores/
 │   ├── symbol_table.py      # Symbol table
 │   ├── codegen.py           # TAC generator
 │   ├── c_codegen.py         # C code generator
+│   ├── arm_codegen.py       # ARMv7 (CPUlator) generator
 │   ├── backend.py           # GCC integration
+│   ├── runner.py            # Runtime executor (channels)
+│   ├── minipar_cli.py       # Subcommand CLI
 │   └── compiler.py          # Main driver
 │
-├── examples/                 # Example programs
-│   ├── ex1.minipar          # Variables, loops
-│   ├── ex5.minipar          # Functions
-│   ├── fatorial_rec.minipar # Recursion
-│   └── ...                  # More examples
-│
+├── examples/                 # Example programs (.minipar)
+├── compile.py                # Convenience wrapper around src/compiler.py
+├── run_tests.py              # Test runner
 └── docs/                     # Documentation
-    ├── README.md            # Main documentation
-    ├── ARCHITECTURE.md      # System design
-    └── ...                  # Phase reports
 ```
 
 ---
@@ -612,47 +776,72 @@ projeto_compiladores/
 
 ### Problem: "gcc not found"
 
-**Solution:**
-1. Install GCC (see Prerequisites)
-2. Add GCC to PATH
-3. Restart terminal
+**Solution:** Install GCC (see Prerequisites), then make sure it's on your `PATH` and
+restart the terminal.
 
-**Windows:**
-```bash
-# Add MinGW to PATH
-set PATH=%PATH%;C:\MinGW\bin
+**Windows (MSYS2 / MinGW example):**
+```bat
+set PATH=%PATH%;C:\msys64\mingw64\bin
 ```
+
+**Linux:**
+```bash
+sudo apt-get install gcc   # Debian/Ubuntu
+```
+
+> You only need GCC for the `--exe` step. Without it, `--tokens`, `--ast`,
+> `--semantic`, `--generate-c`, and ARM generation still work.
 
 ### Problem: "Python not found"
 
-**Solution:**
-Use `py` instead of `python`:
+**Windows:** Use `py` instead of `python`:
+```bat
+py compile.py program.minipar --exe
+```
+
+**Linux/macOS:** Use `python3`:
 ```bash
-py src\compiler.py program.minipar --exe
+python3 compile.py program.minipar --exe
 ```
 
 ### Problem: Compilation errors
 
 **Check:**
-1. Syntax errors in your .minipar file
+1. Syntax errors in your `.minipar` file
 2. Run with `--semantic` to see detailed errors
-3. Review example programs for correct syntax
+3. Review the example programs for correct syntax
+4. Don't name a function `main` (it collides with C's `main()`)
 
 ### Problem: "Module not found"
 
-**Solution:**
-Make sure you're in the project root directory:
+**Solution:** Make sure you're in the project root directory:
+
+**Linux/macOS:**
 ```bash
 cd projeto_compiladores
-py src\compiler.py examples\ex5.minipar --exe
+python3 compile.py examples/ex5.minipar --exe
+```
+
+**Windows:**
+```bat
+cd projeto_compiladores
+py compile.py examples\ex5.minipar --exe
 ```
 
 ### Problem: Executable won't run
 
-**Check:**
-1. Compilation succeeded (look for "✓ Executable generated")
-2. File exists: `dir *.exe` (Windows) or `ls *.exe` (Linux)
-3. Run from correct directory
+**Linux/macOS:**
+```bash
+ls output           # confirm it exists
+chmod +x output     # ensure it's executable
+./output            # run with explicit ./ prefix
+```
+
+**Windows:**
+```bat
+dir output.exe
+.\output.exe
+```
 
 ---
 
@@ -699,85 +888,54 @@ while (condition) {
 
 ### Built-in Functions
 - `print(...)` - Print values to console
-
----
-
-## Performance Tips
-
-### 1. Use GCC Optimization
-
-The compiler uses `-O2` optimization by default, which provides:
-- Loop unrolling
-- Function inlining
-- Dead code elimination
-- Register optimization
-
-### 2. Prefer Local Variables
-
-Local variables are faster than global variables.
-
-### 3. Minimize Function Calls in Loops
-
-When possible, hoist function calls out of loops.
+- `input(...)` - Read input
 
 ---
 
 ## Next Steps
 
-### Learn More
-
-1. **Read the docs:** Check out `docs/ARCHITECTURE.md` for system design
-2. **Study examples:** All example programs in `examples/` folder
-3. **Experiment:** Modify examples and see what happens
-4. **Extend:** Add new features (see IMPLEMENTATION_PLAN.md)
-
-### Advanced Topics
-
-1. **Add array support** - Modify parser to support indexing
-2. **Implement for loops** - Add new syntax to parser
-3. **Optimize TAC** - Add optimization passes
-4. **Target ARM** - Cross-compile for ARM devices
+1. **Read the docs:** See [README.md](../../README.md) for the full feature list.
+2. **Study examples:** All example programs live in the `examples/` folder.
+3. **Try channels:** [QUICK_START_CHANNELS.md](QUICK_START_CHANNELS.md) walks through a
+   client/server program across two terminals.
+4. **Explore ARM:** [ARM_COMPILATION_GUIDE.md](ARM_COMPILATION_GUIDE.md) covers the
+   CPUlator workflow.
 
 ---
 
 ## Useful Commands Summary
 
+**Linux/macOS:**
 ```bash
 # Quick compile and run
-py src\compiler.py examples\ex5.minipar --exe && .\output.exe
+python3 compile.py examples/ex5.minipar --exe && ./output
 
 # See all compilation stages
-py src\compiler.py program.minipar --tokens --ast --semantic --exe
-
-# Generate both assembly and executable
-py src\compiler.py program.minipar --asm --exe --output myprogram
+python3 compile.py program.minipar --tokens --ast --semantic --exe
 
 # View generated C code
-py src\compiler.py program.minipar --generate-c && type output.c
+python3 compile.py program.minipar --generate-c && cat output.c
 
-# Test all examples
-for %f in (examples\*.minipar) do (
-    py src\compiler.py %f --exe --output test_%~nf
-)
+# Run all examples
+for f in examples/*.minipar; do
+    python3 compile.py "$f" --exe --output "test_$(basename "$f" .minipar)"
+done
 ```
 
----
+**Windows (cmd):**
+```bat
+:: Quick compile and run
+py compile.py examples\ex5.minipar --exe && .\output.exe
 
-## Getting Help
+:: See all compilation stages
+py compile.py program.minipar --tokens --ast --semantic --exe
 
-### Resources
+:: View generated C code
+py compile.py program.minipar --generate-c && type output.c
 
-1. **Documentation:** `docs/` folder
-2. **Examples:** `examples/` folder with working programs
-3. **Phase Reports:** PHASE1_COMPLETE.md, PHASE2_COMPLETE.md, etc.
-4. **Bug Reports:** BUGS_FOUND.md for known issues
-
-### Quick Reference
-
-- **Main compiler:** `src/compiler.py`
-- **Example programs:** `examples/*.minipar`
-- **Documentation:** `docs/*.md`
-- **Test files:** `tests/*.py`
+:: Run all examples
+for %f in (examples\*.minipar) do py compile.py %f --exe --output test_%~nf
+```
 
 ---
 
@@ -785,35 +943,31 @@ for %f in (examples\*.minipar) do (
 
 After completing this tutorial, you should be able to:
 
-- [ ] Compile a Minipar program to executable
+- [ ] Compile a Minipar program to an executable on Windows **and** Linux
 - [ ] Create your own Minipar programs
 - [ ] Understand the compilation pipeline
 - [ ] Use all compiler flags effectively
 - [ ] Debug compilation errors
-- [ ] Generate assembly code
-- [ ] View intermediate representations
-- [ ] Run and test programs
+- [ ] View intermediate representations (tokens, AST, C, ARM)
+- [ ] Run programs directly with the runtime executor
 
 ---
 
 ## Conclusion
 
-You now have a complete understanding of how to use the Minipar Compiler! 
+You now have a complete, cross-platform understanding of how to use the Minipar Compiler!
 
 **Key Takeaways:**
-- ✅ Complete compilation pipeline working
-- ✅ Multiple output formats (C, Assembly, Executable)
+- ✅ Complete compilation pipeline working on Windows and Linux
+- ✅ Multiple output formats (C, ARM assembly, native executable)
 - ✅ Comprehensive debugging options
-- ✅ Production-ready code generation
-- ✅ Cross-platform support
-
-**Next Challenge:** Try creating your own Minipar program!
+- ✅ Two CLIs (`compile.py` and `src/minipar_cli.py`) plus a runtime executor
 
 Happy compiling! 🎉
 
 ---
 
-**Tutorial Version:** 1.0  
-**Last Updated:** January 10, 2025  
-**Tested On:** Windows 10, Python 3.7+, GCC 6.3.0  
+**Tutorial Version:** 2.0
+**Last Updated:** 2026-06-14
+**Tested On:** Linux (Python 3.14, GCC 16) and Windows 10/11 (Python 3.13, MinGW GCC)
 **Project Status:** Production Ready ✅

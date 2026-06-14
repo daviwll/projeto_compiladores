@@ -1,18 +1,60 @@
-# 🔄 ARM Compilation Guide - DEPRECATED
+# 🔄 ARM Compilation Guide
 
-**⚠️ NOTICE: This feature has been removed.**
+> **⚠️ The old `--arch` / `--asm` flags were removed.** ARM assembly is now generated
+> **automatically** for the CPUlator ARMv7 target. The current workflow below replaces
+> the historical instructions kept at the bottom for reference.
 
-The `--arch` and `--asm` flags have been removed from the compiler as they were incorrectly implemented. 
+## ✅ Current ARM Workflow (Windows & Linux)
 
-The compiler now only supports native compilation to executables using GCC.
+The compiler emits ARMv7 assembly (`.s`) by default whenever you run `compile.py`.
+There is **no flag needed** to get ARM — use `--no-asm` only if you want to skip it.
 
-For the current compiler capabilities, see:
+**Linux/macOS:**
+```bash
+# Generates output.c, output.s (ARM), and the native executable
+python3 compile.py examples/ex5.minipar --exe
+
+# View the ARM assembly
+cat output.s
+
+# Custom output base name (writes myprog.c and myprog.s):
+python3 compile.py examples/ex5.minipar --generate-c --output myprog
+cat myprog.s
+```
+
+**Windows:**
+```bat
+:: Generates output.c, output.s (ARM), and output.exe
+py compile.py examples\ex5.minipar --exe
+
+:: View the ARM assembly
+type output.s
+```
+
+You can also use the subcommand CLI, which prints/saves ARM directly:
+
+**Linux/macOS:**
+```bash
+python3 src/minipar_cli.py generate-arm examples/ex5.minipar
+```
+
+**Windows:**
+```bat
+py src\minipar_cli.py generate-arm examples\ex5.minipar
+```
+
+> The generated `.s` targets [CPUlator](https://cpulator.01xz.net/) (ARMv7). Paste the
+> contents of `output.s` into CPUlator to run/inspect it. Note that `print` is a stub in
+> the ARM backend — arithmetic and control flow are validated via registers and the
+> Memory tab rather than console output.
+
+For the rest of the compiler's capabilities, see:
 - [README.md](../../README.md)
 - [TUTORIAL.md](TUTORIAL.md)
 
 ---
 
-## Original Documentation (For Reference Only)
+## Original Documentation (Historical — uses removed `--arch`/`--asm` flags)
 
 **Quick Guide to Targeting Different Architectures**
 

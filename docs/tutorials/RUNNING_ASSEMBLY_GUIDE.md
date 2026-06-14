@@ -1,29 +1,41 @@
-# 🏃 How to Run Assembly Code - DEPRECATED
+# 🏃 How to Run Assembly Code
 
-**⚠️ NOTICE: Assembly generation has been removed.**
+> **⚠️ The old `--asm` flag was removed.** The compiler now produces a native
+> executable (via GCC) **and** an ARMv7 `.s` file (for CPUlator) automatically. The
+> current cross-platform workflow is below; the historical instructions kept at the
+> bottom reference the removed `--asm` flag.
 
-The `--asm` flag has been removed from the compiler as it was incorrectly implemented.
+## 🎯 Current Method (Windows & Linux)
 
-The compiler now only generates executables directly using GCC.
+Running `compile.py` with `--exe` produces three things at once: `output.c`,
+`output.s` (ARM assembly for CPUlator), and a native executable.
 
----
-
-## 🎯 Current Method
-
-The **only way** to compile programs is to generate the executable directly:
-
+**Linux/macOS:**
 ```bash
-py compile.py program.minipar --exe
-.\output.exe
+python3 compile.py program.minipar --exe
+./output                 # run the native binary
+cat output.s             # inspect the ARM assembly
 ```
 
-For the current compiler capabilities, see:
+**Windows:**
+```bat
+py compile.py program.minipar --exe
+.\output.exe             :: run the native binary
+type output.s            :: inspect the ARM assembly
+```
+
+Add `--no-asm` if you only want the native executable and not the `.s` file.
+
+To run the ARM assembly itself, paste `output.s` into
+[CPUlator](https://cpulator.01xz.net/) — see [ARM_COMPILATION_GUIDE.md](ARM_COMPILATION_GUIDE.md).
+
+For the rest of the compiler's capabilities, see:
 - [README.md](../../README.md)
 - [TUTORIAL.md](TUTORIAL.md)
 
 ---
 
-## Original Documentation (For Reference Only)
+## Original Documentation (Historical — uses the removed `--asm` flag)
 
 **Complete Guide to Executing Generated Assembly Files**
 

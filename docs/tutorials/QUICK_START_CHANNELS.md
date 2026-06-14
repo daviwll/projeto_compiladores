@@ -2,12 +2,22 @@
 
 ## TL;DR
 
+**Linux/macOS:**
 ```bash
 # Terminal 1 (Server)
-py src\runner.py .\examples\calc_server.minipar
+python3 src/runner.py examples/calc_server.minipar
 
 # Terminal 2 (Client)
-py src\runner.py .\examples\calc_client.minipar
+python3 src/runner.py examples/calc_client.minipar
+```
+
+**Windows:**
+```bat
+:: Terminal 1 (Server)
+py src\runner.py examples\calc_server.minipar
+
+:: Terminal 2 (Client)
+py src\runner.py examples\calc_client.minipar
 ```
 
 **Result**: Client performs 4 calculations (add, subtract, multiply, divide) and receives results from server! 🎉
@@ -18,7 +28,8 @@ py src\runner.py .\examples\calc_client.minipar
 
 - Python 3.7+
 - Two terminal windows
-- Windows (tested) / Linux / Mac
+- Works on Windows **and** Linux/macOS (only the interpreter name and path
+  separators differ — see each step below)
 
 ---
 
@@ -26,14 +37,28 @@ py src\runner.py .\examples\calc_client.minipar
 
 ### 1. Open First Terminal (Server)
 
-Navigate to project directory:
+Navigate to the project directory:
+
+**Linux/macOS:**
 ```bash
-cd C:\Users\gui\Documents\code\compiladores\projeto_compiladores
+cd ~/path/to/projeto_compiladores
+```
+
+**Windows:**
+```bat
+cd C:\path\to\projeto_compiladores
 ```
 
 Start the server:
+
+**Linux/macOS:**
 ```bash
-py src\runner.py .\examples\calc_server.minipar
+python3 src/runner.py examples/calc_server.minipar
+```
+
+**Windows:**
+```bat
+py src\runner.py examples\calc_server.minipar
 ```
 
 **You should see:**
@@ -52,14 +77,28 @@ Server is ready and waiting for connections...
 
 ### 2. Open Second Terminal (Client)
 
-Navigate to same directory:
+Navigate to the same directory:
+
+**Linux/macOS:**
 ```bash
-cd C:\Users\gui\Documents\code\compiladores\projeto_compiladores
+cd ~/path/to/projeto_compiladores
+```
+
+**Windows:**
+```bat
+cd C:\path\to\projeto_compiladores
 ```
 
 Run the client:
+
+**Linux/macOS:**
 ```bash
-py src\runner.py .\examples\calc_client.minipar
+python3 src/runner.py examples/calc_client.minipar
+```
+
+**Windows:**
+```bat
+py src\runner.py examples\calc_client.minipar
 ```
 
 **You should see:**
@@ -201,11 +240,21 @@ my_client.close()
 
 ### Run Them
 
+**Linux/macOS:**
 ```bash
 # Terminal 1
-py src\runner.py my_server.minipar
+python3 src/runner.py my_server.minipar
 
 # Terminal 2
+python3 src/runner.py my_client.minipar
+```
+
+**Windows:**
+```bat
+:: Terminal 1
+py src\runner.py my_server.minipar
+
+:: Terminal 2
 py src\runner.py my_client.minipar
 ```
 
@@ -233,6 +282,6 @@ See `CHANNEL_TUTORIAL.md` for:
 
 ---
 
-**Last Updated**: 2025-10-23  
-**Tested On**: Windows 10/11  
+**Last Updated**: 2026-06-14  
+**Tested On**: Linux (Python 3.14) and Windows 10/11 (Python 3.13)  
 **Status**: ✅ Fully Working

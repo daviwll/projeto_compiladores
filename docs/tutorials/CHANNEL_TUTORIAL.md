@@ -136,7 +136,14 @@ print("Connection closed.")
 ### Step 3: Run in Two Terminals
 
 #### Terminal 1 (Server)
+
+**Linux/macOS:**
 ```bash
+python3 src/runner.py calc_server.minipar
+```
+
+**Windows:**
+```bat
 py src\runner.py calc_server.minipar
 ```
 
@@ -155,7 +162,14 @@ Server is ready and waiting for connections...
 ```
 
 #### Terminal 2 (Client)
+
+**Linux/macOS:**
 ```bash
+python3 src/runner.py calc_client.minipar
+```
+
+**Windows:**
+```bat
 py src\runner.py calc_client.minipar
 ```
 
@@ -319,7 +333,14 @@ Servers run indefinitely until terminated:
 ## Comparison: Compile vs Run
 
 ### Compile Mode (Traditional)
+
+**Linux/macOS:**
 ```bash
+python3 compile.py program.minipar
+```
+
+**Windows:**
+```bat
 py compile.py program.minipar
 ```
 - **Output**: TAC (Three-Address Code)
@@ -327,7 +348,14 @@ py compile.py program.minipar
 - **No runtime**: Channels are commented out
 
 ### Run Mode (New!)
+
+**Linux/macOS:**
 ```bash
+python3 src/runner.py program.minipar
+```
+
+**Windows:**
+```bat
 py src\runner.py program.minipar
 ```
 - **Output**: Program execution results
@@ -379,19 +407,40 @@ py src\runner.py program.minipar
 ## Testing Your Own Programs
 
 ### 1. Test Simple Programs First
+
+**Linux/macOS:**
 ```bash
+python3 src/runner.py test_runner_simple.minipar
+```
+
+**Windows:**
+```bat
 py src\runner.py test_runner_simple.minipar
 ```
 
 ### 2. Test Server Separately
 Start the server and verify it runs:
+
+**Linux/macOS:**
 ```bash
+python3 src/runner.py your_server.minipar
+```
+
+**Windows:**
+```bat
 py src\runner.py your_server.minipar
 ```
 
 ### 3. Test Client
 In another terminal:
+
+**Linux/macOS:**
 ```bash
+python3 src/runner.py your_client.minipar
+```
+
+**Windows:**
+```bat
 py src\runner.py your_client.minipar
 ```
 
@@ -425,7 +474,7 @@ py src\runner.py your_client.minipar
 ✅ **YES, the current project now supports actual runtime execution with channels!**
 
 You can now:
-1. Run programs directly with `py src\runner.py file.minipar`
+1. Run programs directly with `python3 src/runner.py file.minipar` (Linux/macOS) or `py src\runner.py file.minipar` (Windows)
 2. Create socket servers with `s_channel`
 3. Connect clients with `c_channel`
 4. Exchange data between terminals over the network
@@ -437,6 +486,6 @@ The implementation uses Python's `socket` and `threading` libraries to provide r
 
 ---
 
-**Last Updated**: 2025-10-23  
+**Last Updated**: 2026-06-14  
 **Status**: ✅ Fully Functional  
-**Tested**: Windows (should work on Linux/Mac with minor path adjustments)
+**Tested**: Linux (Python 3.14) and Windows 10/11 (Python 3.13)
