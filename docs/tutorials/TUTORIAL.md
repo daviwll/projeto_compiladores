@@ -16,7 +16,8 @@
 8. [Tutorial 4: Recursive Functions](#tutorial-4-recursive-functions)
 9. [Tutorial 5: Complete Compilation Pipeline](#tutorial-5-complete-compilation-pipeline)
 10. [Advanced Features](#advanced-features)
-11. [Troubleshooting](#troubleshooting)
+11. [Running the Web Interface (Gradio)](#running-the-web-interface-gradio)
+12. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -772,6 +773,68 @@ projeto_compiladores/
 
 ---
 
+## Running the Web Interface (Gradio)
+
+Prefer a browser to the command line? The project ships a **Gradio web interface** that
+lets you edit, compile, inspect, and run Minipar programs interactively — including
+ready-to-load examples (Hello World, OO classes, and the **Perceptron** and **XOR
+Neural Network** demos).
+
+### Step 1: Install Gradio (one time)
+
+**Linux/macOS:**
+```bash
+pip install gradio
+```
+
+**Windows:**
+```bat
+py -m pip install gradio
+```
+
+### Step 2: Launch the Interface
+
+The easiest way is the launcher script in the `interface/` folder:
+
+**Linux/macOS:**
+```bash
+cd interface
+chmod +x start.sh   # first time only
+./start.sh
+```
+
+**Windows:**
+```bat
+cd interface
+start.bat
+```
+
+Or start it manually:
+
+**Linux/macOS:**
+```bash
+cd interface
+python3 app.py
+```
+
+**Windows:**
+```bat
+cd interface
+py app.py
+```
+
+### Step 3: Open It
+
+Browse to **http://localhost:7860**. Use the **Compiler** tab to view tokens/AST/TAC/C/ARM,
+or the **Execute** tab to run a program directly. Load **NN: Perceptron (Neuron)** or
+**NN: Neural Network (XOR)** from the *Load Example Program* dropdown to see the neural
+network demos in action.
+
+> 📚 Full interface docs: [../../interface/QUICKSTART.md](../../interface/QUICKSTART.md)
+> and [../../interface/INSTALLATION.md](../../interface/INSTALLATION.md).
+
+---
+
 ## Troubleshooting
 
 ### Problem: "gcc not found"
@@ -900,6 +963,8 @@ while (condition) {
    client/server program across two terminals.
 4. **Explore ARM:** [ARM_COMPILATION_GUIDE.md](ARM_COMPILATION_GUIDE.md) covers the
    CPUlator workflow.
+5. **Use the web UI:** See [Running the Web Interface (Gradio)](#running-the-web-interface-gradio)
+   above, or the full guide in [../../interface/QUICKSTART.md](../../interface/QUICKSTART.md).
 
 ---
 

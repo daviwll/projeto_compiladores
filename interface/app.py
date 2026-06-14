@@ -167,6 +167,202 @@ var d: Dog = new Dog()
 print("Animal speaks:", d.speak())
 print("Dog fetches:", d.fetch())
 print("Name:", d.getName())
+""",
+
+    "NN: Perceptron (Neuron)": """# Neural Networks: single Perceptron (Neuron) trained with the step rule.
+# Object-oriented example. Run it from the "Execute" tab to watch it learn.
+class Neuronio {
+    var input_val: number = 0
+    var output_desejado: number = 0
+    var peso: number = 0.5
+    var bias: number = 1
+    var peso_bias: number = 0.5
+    var taxa_aprendizado: number = 0.01
+    var erro: number = 999999
+    var iteracao: number = 0
+
+    # Constructor: receives the input and the desired output
+    func Neuronio(input_val: number, output_desejado: number) -> void {
+        this.input_val = input_val
+        this.output_desejado = output_desejado
+    }
+
+    # Activation (step): 1 if sum >= 0, otherwise 0
+    func ativacao(soma: number) -> number {
+        if (soma >= 0) {
+            return 1
+        }
+        return 0
+    }
+
+    # Train the neuron until the error reaches zero
+    func treinar() -> void {
+        print("Input:", this.input_val, "| Desired output:", this.output_desejado)
+        while (this.erro != 0) {
+            this.iteracao = this.iteracao + 1
+            print("")
+            print("#### Iteration:", this.iteracao)
+            print("Weight:", this.peso)
+
+            var soma: number = (this.input_val * this.peso) + (this.bias * this.peso_bias)
+            var saida: number = this.ativacao(soma)
+            print("Output:", saida)
+
+            this.erro = this.output_desejado - saida
+            print("Error:", this.erro)
+
+            if (this.erro != 0) {
+                this.peso = this.peso + (this.taxa_aprendizado * this.input_val * this.erro)
+                print("Bias weight:", this.peso_bias)
+                this.peso_bias = this.peso_bias + (this.taxa_aprendizado * this.bias * this.erro)
+            }
+        }
+        print("")
+        print("Done! The neuron has learned.")
+        print("Desired value:", this.output_desejado)
+    }
+}
+
+var neuronio: Neuronio = new Neuronio(1, 0)
+neuronio.treinar()
+""",
+
+    "NN: Neural Network (XOR)": """# Neural Networks: a small network that learns the XOR function.
+# Hidden layer of 3 neurons + 1 output neuron, trained with feedforward
+# and backpropagation. Run it from the "Execute" tab (takes a few seconds).
+
+# Pseudo-random generator (LCG), since the language has no random()
+var seed: number = 12345
+
+func rand() -> number {
+    seed = (seed * 1103515245 + 12345) % 2147483648
+    return seed / 2147483648
+}
+
+func sigmoid(x: number) -> number {
+    return 1 / (1 + exp(-x))
+}
+
+class Neuronio {
+    var pesos: list = []
+    var bias: number = 0
+    var saida: number = 0
+
+    func Neuronio(num_inputs: number) -> void {
+        this.pesos = []
+        var i: number = 0
+        while (i < num_inputs) {
+            this.pesos.append(rand())
+            i = i + 1
+        }
+        this.bias = rand()
+    }
+
+    func feedforward(entradas: list) -> number {
+        var soma: number = 0
+        var i: number = 0
+        while (i < len(entradas)) {
+            soma = soma + (entradas[i] * this.pesos[i])
+            i = i + 1
+        }
+        soma = soma + this.bias
+        this.saida = sigmoid(soma)
+        return this.saida
+    }
+
+    func calcular_derivada() -> number {
+        return this.saida * (1 - this.saida)
+    }
+}
+
+class RedeNeural {
+    var taxa_aprendizado: number = 0.5
+    var camada_oculta: list = []
+    var neuronio_saida: Neuronio
+    var saidas_ocultas: list = []
+    var saida_final: number = 0
+
+    func RedeNeural() -> void {
+        this.camada_oculta = []
+        var i: number = 0
+        while (i < 3) {
+            this.camada_oculta.append(new Neuronio(2))
+            i = i + 1
+        }
+        this.neuronio_saida = new Neuronio(3)
+    }
+
+    func feedforward(entradas: list) -> number {
+        this.saidas_ocultas = []
+        var i: number = 0
+        while (i < len(this.camada_oculta)) {
+            var n: Neuronio = this.camada_oculta[i]
+            this.saidas_ocultas.append(n.feedforward(entradas))
+            i = i + 1
+        }
+        this.saida_final = this.neuronio_saida.feedforward(this.saidas_ocultas)
+        return this.saida_final
+    }
+
+    func backpropagation(entradas: list, saida_desejada: number) -> void {
+        var erro: number = saida_desejada - this.saida_final
+        var delta_saida: number = erro * this.neuronio_saida.calcular_derivada()
+
+        # Update the output neuron weights
+        var i: number = 0
+        while (i < len(this.neuronio_saida.pesos)) {
+            this.neuronio_saida.pesos[i] = this.neuronio_saida.pesos[i] + (this.saidas_ocultas[i] * delta_saida * this.taxa_aprendizado)
+            i = i + 1
+        }
+        this.neuronio_saida.bias = this.neuronio_saida.bias + (delta_saida * this.taxa_aprendizado)
+
+        # Update the hidden layer weights
+        i = 0
+        while (i < len(this.camada_oculta)) {
+            var neuronio: Neuronio = this.camada_oculta[i]
+            var delta_oculto: number = delta_saida * this.neuronio_saida.pesos[i] * neuronio.calcular_derivada()
+            var j: number = 0
+            while (j < len(neuronio.pesos)) {
+                neuronio.pesos[j] = neuronio.pesos[j] + (entradas[j] * delta_oculto * this.taxa_aprendizado)
+                j = j + 1
+            }
+            neuronio.bias = neuronio.bias + (delta_oculto * this.taxa_aprendizado)
+            i = i + 1
+        }
+    }
+
+    func treinar(entradas: list, saidas_desejadas: list, epocas: number) -> void {
+        var e: number = 0
+        while (e < epocas) {
+            var k: number = 0
+            while (k < len(entradas)) {
+                this.feedforward(entradas[k])
+                this.backpropagation(entradas[k], saidas_desejadas[k])
+                k = k + 1
+            }
+            e = e + 1
+        }
+    }
+
+    func testar(entradas: list) -> void {
+        var k: number = 0
+        while (k < len(entradas)) {
+            var resultado: number = this.feedforward(entradas[k])
+            print("Input:", entradas[k], "Predicted Output:", resultado)
+            k = k + 1
+        }
+    }
+}
+
+# XOR data
+var entradas: list = [[0, 0], [0, 1], [1, 0], [1, 1]]
+var saidas_desejadas: list = [0, 1, 1, 0]
+
+var rede: RedeNeural = new RedeNeural()
+# 3000 epochs keeps the web demo under the 10s execution limit while still
+# learning XOR (outputs ~0 for 00/11 and ~1 for 01/10).
+rede.treinar(entradas, saidas_desejadas, 3000)
+rede.testar(entradas)
 """
 }
 
@@ -482,7 +678,9 @@ with gr.Blocks(title="Minipar Compiler") as app:
                 - **Factorial** - Recursive functions
                 - **OO: Counter Class** - Classes, fields, methods, reset
                 - **OO: Inheritance** - Extends, inherited methods
-                
+                - **NN: Perceptron (Neuron)** - A single neuron that learns with the step rule
+                - **NN: Neural Network (XOR)** - Hidden layer + backprop learning XOR (run in Execute tab)
+
                 ## 🐛 Troubleshooting
                 
                 - **Compilation Error**: Check syntax and type errors

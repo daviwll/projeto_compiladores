@@ -51,9 +51,16 @@ pip install -r requirements.txt
 
 ### Step 2: Verify Installation
 
+**Linux/macOS:**
 ```bash
 cd interface
-python test_setup.py
+python3 test_setup.py
+```
+
+**Windows:**
+```bat
+cd interface
+py test_setup.py
 ```
 
 If all checks pass, you're ready! ✅
@@ -79,9 +86,16 @@ chmod +x start.sh
 
 ### Option 2: Manual Start
 
+**Linux/macOS:**
 ```bash
 cd interface
-python app.py
+python3 app.py
+```
+
+**Windows:**
+```bat
+cd interface
+py app.py
 ```
 
 ### Step 3: Access Interface
@@ -109,6 +123,11 @@ The interface will open automatically!
 - Loops
 - Conditionals
 - Factorial (Recursive)
+- Input Example
+- OO: Counter Class
+- OO: Inheritance
+- NN: Perceptron (Neuron)
+- NN: Neural Network (XOR)
 
 **Compilation Options** (Toggle buttons)
 - 🔤 **Show Tokens** - Lexical analysis output
@@ -708,8 +727,8 @@ If you've followed this guide, you should have:
 
 ---
 
-**Version:** 1.0
-**Last Updated:** January 2025
+**Version:** 2.0
+**Last Updated:** 2026-06-14
 **Status:** ✅ Production Ready
-**Framework:** Gradio 4.0+
+**Framework:** Gradio (tested on 6.x)
 **Platform:** Cross-platform (Windows, Linux, macOS)
