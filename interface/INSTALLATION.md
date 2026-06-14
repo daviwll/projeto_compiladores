@@ -158,6 +158,12 @@ The interface will open automatically!
 - Example program loader
 - 10-second execution timeout
 
+> ℹ️ The **Execute** tab runs your program through the Minipar **interpreter**
+> (`src/runner.py`), which supports the full language — floating-point math, objects
+> and inheritance, lists, and built-ins like `exp()`/`len()`. This is why programs such
+> as **NN: Perceptron** and **NN: Neural Network (XOR)** run here even though the
+> *Compile & Download .exe* path (C/GCC backend) only covers a simpler subset.
+
 **Usage**
 1. Write or load code
 2. Enter input (if needed)

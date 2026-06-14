@@ -161,79 +161,109 @@ class CompilerAPI:
     
     def execute_code(self, source_code, user_input=""):
         """
-        Execute Minipar code and return output
-        
+        Execute Minipar code and return output.
+
+        Runs the program through the Minipar runtime interpreter (src/runner.py),
+        NOT the C/GCC backend. The interpreter is the only executor that fully
+        supports the language: floating-point numbers, objects/inheritance, lists,
+        and built-ins like exp()/len(). The C backend is intended for the
+        "Download .exe" path and only covers a simpler subset.
+
         Args:
             source_code: Minipar source code
-            user_input: Input to provide to the program
-            
+            user_input: Input to provide to the program (one value per line)
+
         Returns:
             dict with execution results
         """
-        # First compile to executable
-        compile_result = self.compile_code(
-            source_code,
-            show_tac=False,
-            generate_exe=True
-        )
-        
-        if not compile_result['success']:
+        if not source_code or not source_code.strip():
             return {
                 'success': False,
-                'error': compile_result['error'],
-                'output': compile_result['output']
+                'error': 'No source code provided',
+                'output': '',
             }
-        
-        if not compile_result['exe_file']:
-            return {
-                'success': False,
-                'error': 'Failed to generate executable',
-                'output': compile_result['output']
-            }
-        
-        # Execute the program
-        exe_path = compile_result['exe_file']['path']
-        
+
+        import subprocess
+
+        runner_path = str(project_root / 'src' / 'runner.py')
+
+        # Write the source to a temporary .minipar file for the runner.
+        tmp_path = None
         try:
-            import subprocess
-            
-            # Prepare input
-            stdin_data = user_input.encode('utf-8') if user_input else None
-            
-            # Run the executable
-            process = subprocess.Popen(
-                [exe_path],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
+            with tempfile.NamedTemporaryFile(
+                mode='w', suffix='.minipar', encoding='utf-8',
+                dir=self.temp_dir, delete=False
+            ) as tmp:
+                tmp.write(source_code)
+                tmp_path = tmp.name
+
+            stdin_data = user_input if user_input else None
+
+            result = subprocess.run(
+                [sys.executable, runner_path, tmp_path],
+                input=stdin_data,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
-            
-            stdout, stderr = process.communicate(input=stdin_data, timeout=10)
-            
-            output = stdout.decode('utf-8', errors='replace')
-            if stderr:
-                error_output = stderr.decode('utf-8', errors='replace')
-                if error_output.strip():  # Only add if there's actual error content
-                    output += f"\n\nStderr:\n{error_output}"
-            
+
+            output = self._clean_runner_output(result.stdout)
+
+            if result.stderr and result.stderr.strip():
+                # The runner reports semantic/runtime errors on stderr.
+                return {
+                    'success': False,
+                    'output': output,
+                    'error': result.stderr.strip(),
+                }
+
             return {
                 'success': True,
                 'output': output,
-                'error': ''
+                'error': '',
             }
-            
+
         except subprocess.TimeoutExpired:
             return {
                 'success': False,
                 'output': '',
-                'error': 'Execution timeout (10 seconds)'
+                'error': 'Execution timeout (10 seconds)',
             }
         except Exception as e:
             return {
                 'success': False,
                 'output': '',
-                'error': f'Execution error: {str(e)}'
+                'error': f'Execution error: {str(e)}',
             }
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+
+    @staticmethod
+    def _clean_runner_output(raw):
+        """Strip the runner's banner/footer so only the program output remains."""
+        if not raw:
+            return ''
+        lines = raw.splitlines()
+        cleaned = []
+        for line in lines:
+            stripped = line.strip()
+            if set(stripped) == {'='} and stripped:  # separator line
+                continue
+            if stripped.startswith('Executing:'):
+                continue
+            if 'Runtime cleanup complete' in stripped:
+                continue
+            cleaned.append(line)
+        # Trim leading/trailing blank lines left behind by the removed banner.
+        while cleaned and not cleaned[0].strip():
+            cleaned.pop(0)
+        while cleaned and not cleaned[-1].strip():
+            cleaned.pop()
+        return '\n'.join(cleaned)
 
 
 # Global API instance
